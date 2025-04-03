@@ -1,0 +1,75 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+env/
+ENV/
+virtualenv/
+*.egg-info/
+
+# Distribution / packaging
+.Python
+_build/
+dist/
+build/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg
+*.whl
+*.zip
+*.tar.gz
+*.tar.bz2
+
+# PyInstaller distribution
+/dist
+
+# IDE / Editor
+.idea/
+.project
+*.swp
+*.swo
+*.tmproj
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+
+
+# Log and temp files
+*.log
+*.tmp
+tmp/
+
+# Specific files you don't want to track
+secrets.py  # Файл с секретными ключами, например
+config.ini
+
+# Coverage data
+.coverage
+htmlcov/
+
+# Jupyter Notebook checkpoint files
+.ipynb_checkpoints/
+
+# enviroment params
+.env
+
+# db files
+*.db
+
+# docx files
+*.docx
