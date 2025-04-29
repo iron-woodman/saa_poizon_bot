@@ -2,10 +2,13 @@ from aiogram.filters import CommandStart
 from aiogram import types, F, Bot, Router
 from pathlib import Path
 from aiogram.types import ReplyKeyboardRemove, FSInputFile, CallbackQuery
-from app.keyboards.user_keyboards import main_keyboard, user_inline_menu
+from app.keyboards.main_kb import main_keyboard, user_inline_menu
+from app.keyboards.admin_kb import admin_keyboard
+from app.config import is_admin
 
 
 router = Router()
+
 
 
 @router.message(CommandStart())
@@ -20,17 +23,26 @@ async def start_command(message: types.Message, bot: Bot):
         return
 
     try:
-        # Используем FSInputFile для указания, что это локальный файл
         photo = FSInputFile(path=str(image_path))
+        print("message.from_user.id=", message.from_user.id)
+        if is_admin(message.from_user.id):
+            # Пользователь - администратор, отправляем админ-меню
+            await bot.send_photo(
+                chat_id=message.chat.id,
+                photo=photo,
+                caption="Добро пожаловать, администратор!",
+                reply_markup=admin_keyboard # Отправляем клавиатуру администратора
+            )
 
-        await bot.send_photo(
-            chat_id=message.chat.id,
-            photo=photo,  # Передаем FSInputFile
-            caption=(
-                f"""Добро пожаловать!"""
-            ),
-            reply_markup=main_keyboard
-        )
+        else:
+            # Обычный пользователь, отправляем обычное меню
+            await bot.send_photo(
+                chat_id=message.chat.id,
+                photo=photo,
+                caption="Добро пожаловать!",
+                reply_markup=main_keyboard  # Отправляем основную клавиатуру
+            )
+
     except Exception as e:
         await message.reply(f"Ошибка при отправке фото: {e}")
 

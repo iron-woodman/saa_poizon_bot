@@ -1,7 +1,7 @@
 import os
 from aiogram import F, Bot, Router
 from aiogram.types import FSInputFile, CallbackQuery
-from app.keyboards.user_keyboards import main_keyboard
+from app.keyboards.calculate_order_kb import main_keyboard
 from app.database import database
 
 router = Router()

@@ -1,13 +1,9 @@
-# Motivational Telegram Bot
+# poison telegram Bot
 
-A simple Telegram bot that sends daily motivational quotes.
-
+A simple Telegram bot for poison
 ## Features
 
-•   Sends a random motivational quote at a user-defined time.
-•   Allows users to add new quotes.
-•   Allows users to upload a file of quotes.
-•   Stores quotes in a SQLite database.
+
 
 ## Setup
 
