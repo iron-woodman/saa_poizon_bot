@@ -246,7 +246,6 @@ async def process_continue_checkout(callback_query: CallbackQuery, state: FSMCon
     await callback_query.message.answer(confirmation_message, reply_markup=confirmation_keyboard)
     await callback_query.answer()
     unique_order_code = await db.generate_unique_code_for_order()
-    print('unique_order_code=', unique_order_code)
     state.update_data(unique_order_code=unique_order_code)
     await db.add_order(user.id, category, size, color, link, price, delivery_method, total_price, unique_order_code)
 
@@ -323,18 +322,12 @@ async def process_payment_screenshot(message: Message, state: FSMContext, bot: B
 
         await message.answer("Скриншот оплаты получен и отправлен на проверку.\nОжидайте подтверждения от менеджера.")
 
-        test_chat_id = 980992117
         # Отправляем скриншот менеджеру (пример)
         await bot.send_photo(
-    # chat_id=MANAGER_TELEGRAM_ID,
-    chat_id=test_chat_id,
+    chat_id=MANAGER_TELEGRAM_ID,
     photo=FSInputFile(full_file_path),
     caption=f"Новый скриншот оплаты от {message.from_user.full_name} ({message.from_user.id})"
     )
-        # data = await state.get_data()
-        # order_code = data.get('unique_order_code', 'Не указано')
-        # print('order_code=', order_code)
-        # await db.save_payment_screenshot(order_code, full_file_path)
         user = await db.get_user_by_tg_id(message.from_user.id)
         active_orders = await db.get_active_orders_by_tg_id(user.tg_id)
         order = active_orders[-1] #Берем последний заказ, так как он актуальный
