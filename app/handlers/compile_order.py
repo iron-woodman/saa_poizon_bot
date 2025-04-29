@@ -246,7 +246,7 @@ async def process_continue_checkout(callback_query: CallbackQuery, state: FSMCon
     await callback_query.message.answer(confirmation_message, reply_markup=confirmation_keyboard)
     await callback_query.answer()
     unique_order_code = await db.generate_unique_code_for_order()
-    state.update_data(unique_order_code=unique_order_code)
+    await state.update_data(unique_order_code=unique_order_code)
     await db.add_order(user.id, category, size, color, link, price, delivery_method, total_price, unique_order_code)
 
 
@@ -324,7 +324,8 @@ async def process_payment_screenshot(message: Message, state: FSMContext, bot: B
 
         # Отправляем скриншот менеджеру (пример)
         await bot.send_photo(
-    chat_id=MANAGER_TELEGRAM_ID,
+    # chat_id=MANAGER_TELEGRAM_ID,
+    chat_id=980992117,
     photo=FSInputFile(full_file_path),
     caption=f"Новый скриншот оплаты от {message.from_user.full_name} ({message.from_user.id})"
     )

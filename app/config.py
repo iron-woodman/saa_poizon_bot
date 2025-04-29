@@ -24,13 +24,10 @@ if not os.path.exists(PAY_SCREENS_DIR):
 
 def is_admin(user_id: int) -> bool:
     admin_ids = []
-    print(MANAGER_TELEGRAM_ID)
     admin_ids.append(int(MANAGER_TELEGRAM_ID))
-    print("admin_ids", admin_ids)
     current_directory = os.path.abspath(".")
 
     # Выводим его на экран
-    print(f"Текущий каталог: {current_directory}")  
     """Проверяет, является ли пользователь администратором."""
     if user_id in admin_ids:
         print('админ')
