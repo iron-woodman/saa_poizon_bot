@@ -117,7 +117,7 @@ async def process_order_selection(callback: CallbackQuery, state: FSMContext, db
     if order:
         await state.update_data(order_code=order_code)
         order_info = format_order_for_telegram(order)
-        print(order_info)
+        # print(order_info)
         await callback.message.answer(f"Информация о заказе ({order_code}) : \n{order_info}") # Уведомление вверху экрана
         await callback.message.answer(f"Укажите новый статус заказа:", reply_markup=order_status_keyboard)
     else:

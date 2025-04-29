@@ -1,0 +1,15 @@
+[Unit]
+Description=Telegram bot 'saa_poizon_bot'
+After=syslog.target
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/usr/local/bin/bot/saa_poizon_bot
+ExecStart=/usr/local/bin/bot/saa_poizon_bot/venv/bin/python /usr/local/bin/bot/saa_poizon_bot/bot.py
+RestartSec=10
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
