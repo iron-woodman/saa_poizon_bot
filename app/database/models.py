@@ -6,6 +6,8 @@ from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy import MetaData
 from sqlalchemy.schema import CreateTable
+from sqlalchemy import UniqueConstraint
+
 from app.config import SQLITE_FILE
 # --- Конфигурация ---
 
@@ -28,10 +30,9 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     orders = relationship("Order", back_populates="user") # Связь с таблицей заказов
-
-
     def __repr__(self):
         return f"User(id={self.id}, full_name='{self.full_name}', phone_number='{self.phone_number}')"
+    
 
 class Order(Base):
     __tablename__ = "orders"
@@ -58,4 +59,30 @@ class Order(Base):
 
     def __repr__(self):
         return f"Order(id={self.id}, user_id={self.user_id}, order_date={self.order_date})"
+    
+    
+    
+class ExchangeRate(Base):
+    __tablename__ = "exchange_rates"
+
+    id = Column(Integer, primary_key=True)
+    rate_name = Column(String, unique=True)  # e.g., "cny_to_rub"
+    rate_value = Column(Float)
+
+    def __repr__(self):
+        return f"<ExchangeRate(name='{self.rate_name}', value={self.rate_value})>"
+    
+
+class DeliveryPrice(Base):
+    __tablename__ = "delivery_prices"
+
+    id = Column(Integer, primary_key=True)
+    category = Column(String)
+    delivery_type = Column(String)  # 'auto' or 'avia'
+    price = Column(Float)
+
+    __table_args__ = (UniqueConstraint('category', 'delivery_type', name='_category_delivery_uc'),)
+
+    def __repr__(self):
+        return f"<DeliveryPrice(category='{self.category}', delivery_type='{self.delivery_type}', price={self.price})>"
 

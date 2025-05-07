@@ -1,14 +1,20 @@
+import os
+import json
+import logging
 from aiogram import F, Router, Bot
-from aiogram.types import (Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, 
+from aiogram.types import (Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, Document,
     InlineKeyboardButton, InlineKeyboardMarkup)
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from typing import Optional, List
+
 from app.database.database import Database
 from app.database.models import Order
-from typing import Optional, List
 from app.keyboards.admin_kb import (create_inline_keyboard, CALLBACK_DATA_PREFIX, 
                                     order_status_keyboard, admin_keyboard)
 
+# Получите логгер
+logger = logging.getLogger(__name__)
 
 router = Router()
 
@@ -169,5 +175,60 @@ async def show_all_orders(callback: CallbackQuery, db: Database):
     await callback.message.answer('Основное меню:', reply_markup=admin_keyboard)
 
 
+@router.callback_query(F.data == "update_prices")
+async def show_upload_prompt(callback: CallbackQuery):
+    """Обработчик для кнопки 'Загрузить цены'"""
+    await callback.message.answer("Загрузите JSON файл для обновления цен доставки и курса валют.")
+    await callback.answer()  # Отправляем подтверждение, что callback обработан
 
 
+@router.message(F.document)
+async def handle_document(message: Message, bot: Bot, db: Database):
+    """Обработчик для загрузки JSON файла с ценами и курсом."""
+    document: Document = message.document # Исправлено: Получение document из message, а не из callback
+    if document.mime_type == 'application/json':
+        # Скачиваем файл
+        file_id = document.file_id
+        file = await bot.get_file(file_id)
+        file_path_dl = file.file_path
+        file_path = f"{document.file_name}"  # Убираем временное имя (оно будет создано при скачивании)
+        await bot.download_file(file_path_dl, file_path)
+
+        try:
+            # Обновляем данные в БД
+            success = await update_data_from_json(file_path, db) # Передаем db
+            if success:
+                await message.reply("Цены доставки и курс валют успешно обновлены!")
+            else:
+                await message.reply("Ошибка при обновлении данных. Проверьте формат файла.")
+        except Exception as e:
+            logger.error(f"Ошибка при обработке JSON файла: {e}", exc_info=True)
+            await message.reply("Произошла ошибка при обработке JSON файла. Проверьте его формат.")
+        finally:
+            try:
+                os.remove(file_path) # Пытаемся удалить файл
+            except Exception as e:
+                logger.warning(f"Не удалось удалить временный файл {file_path}: {e}") # Логируем, если не удалось удалить
+    else:
+        await message.reply("Пожалуйста, загрузите JSON файл.")
+
+
+async def update_data_from_json(file_path: str, db: Database) -> bool:
+    """Обновляет курс валют и цены доставки из JSON файла."""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as jsonfile:
+            data = json.load(jsonfile)
+
+        # Обновление курса юаня
+        cny_to_rub = data['exchange_rate']['cny_to_rub']
+        await db.add_or_update_exchange_rate("cny_to_rub", cny_to_rub)
+
+        # Обновление цен доставки
+        for delivery_type, category_prices in data['delivery_types'].items():
+            for category, price in category_prices.items():
+                await db.add_or_update_delivery_price(category, delivery_type, price)
+
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении данных из JSON: {e}", exc_info=True)
+        return False

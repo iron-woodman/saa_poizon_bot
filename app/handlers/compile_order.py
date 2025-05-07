@@ -13,7 +13,7 @@ from app.keyboards.compile_order_kb import (delivery_keyboard, category_keyboard
                                                   cart_keyboard, confirmation_keyboard, 
                                                   track_order_keyboard)
 from app.keyboards.calculate_order_kb import registration_keyboard
-from app.utils.currency import get_currency_cny
+# from app.utils.currency import get_currency_cny
 from app.database.database import Database
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -61,7 +61,7 @@ async def start_order_assembly(callback_query: CallbackQuery, state: FSMContext,
 
 
 @router.callback_query(OrderForm.waiting_for_category, F.data.startswith("category:"))
-async def process_category(callback_query: CallbackQuery, state: FSMContext):
+async def process_category(callback_query: CallbackQuery, state: FSMContext, db: Database):
     """
     Обработчик выбора категории товара.
     """
@@ -75,10 +75,18 @@ async def process_category(callback_query: CallbackQuery, state: FSMContext):
         await state.update_data(category=category)
         await callback_query.message.answer(f"Вы выбрали категорию: {category}")
 
+        # Получаем текущий курс юаня к рублю из БД
+        cny_to_rub = await db.get_exchange_rate("cny_to_rub")
+        if cny_to_rub is None:
+            await callback_query.message.answer("Не удалось получить курс юаня из БД.")
+            await state.clear()
+            await callback_query.answer()
+            return None
+        
         text = (
             "Введите сумму товара в CNY:\n\n"
             f"🇨🇳 Курс на сегодня ({datetime.datetime.now().strftime('%d.%m.%Y')}):\n"
-            f"👉 ¥1 = {get_currency_cny()} ₽\n"
+            f"👉 ¥1 = {cny_to_rub} ₽\n"
         )
 
         await callback_query.message.answer(text)
@@ -164,19 +172,41 @@ async def process_delivery_method(callback_query: CallbackQuery, state: FSMConte
     link = data.get('link', 'Не указано')
     price = data.get('price', 'Не указано')
     delivery_method = data.get('delivery_method', 'Не указано')
-    total_price = price * float(get_currency_cny()) #Рассчет стоимости
 
-    cart_message = f"️КОРЗИНА ЗАКАЗОВ ️\n" \
-                   f"ФИО: {user_data['full_name']}\n" \
-                   f"Контакт: {user_data['phone_number']}\n" \
-                   f"Адрес: {user_data['address']}\n" \
-                   f"‍️ВЫБРАННЫЕ ТОВАРЫ ‍️\n" \
-                   f"➀ Категория товара: {category}\n" \
-                   f"➁ Размер товара: {size}\n" \
-                   f"➂ Цвет товара: {color}\n" \
-                   f"➃ Ссылка на товар: {link}\n" \
-                   f"➄ Стоимость товара: {price:.2f}₽ - ({delivery_method})\n" \
-                   f"ОБЩАЯ СТОИМОСТЬ: {total_price:.2f}₽\n" \
+    # Получаем текущий курс юаня к рублю из БД
+    cny_to_rub = await db.get_exchange_rate("cny_to_rub")
+    if cny_to_rub is None:
+        logging.error("Не удалось получить курс юаня из БД.")
+        await callback_query.message.answer("Не удалось получить курс юаня из БД.")
+        await state.clear()
+        await callback_query.answer()
+        return None
+    
+    # Получаем стоимость доставки в юанях из БД
+    delivery_price_rub = await db.get_delivery_price(category, delivery_method)
+    if delivery_price_rub is None:
+        await callback_query.message.answer("Не удалось получить курс юаня из БД.")
+        await state.clear()
+        await callback_query.answer()
+        logging.error(f"Не удалось получить цену доставки для категории '{category}' и типа '{delivery_method}' из БД.")
+        return None
+
+    price_rub = price * float(cny_to_rub)
+    total_price =  price_rub + delivery_price_rub#Рассчет стоимости
+
+    
+    cart_message = f"️КОРЗИНА ЗАКАЗОВ \n" \
+                    f"ФИО: {user_data['full_name']}\n" \
+                    f"Контакт: {user_data['phone_number']}\n" \
+                    f"Адрес: {user_data['address']}\n" \
+                    f"‍ВЫБРАННЫЕ ТОВАРЫ ‍\n" \
+                    f"➀ Категория товара: {category}\n" \
+                    f"➁ Размер товара: {size}\n" \
+                    f"➂ Цвет товара: {color}\n" \
+                    f"➃ Ссылка на товар: {link}\n" \
+                    f"➄ Стоимость товара: {price_rub:.2f}₽\n" \
+                    f"➅ Стоимость доставки ({delivery_method}): {delivery_price_rub}₽\n" \
+                    f"ОБЩАЯ СТОИМОСТЬ: {total_price:.2f}₽\n"
 
     await callback_query.message.answer(cart_message, reply_markup=cart_keyboard)
     await callback_query.answer()
@@ -223,25 +253,45 @@ async def process_continue_checkout(callback_query: CallbackQuery, state: FSMCon
     link = data.get('link', 'Не указано')
     price = data.get('price', 'Не указано')
     delivery_method = data.get('delivery_method', 'Не указано')
-    total_price = price * get_currency_cny() #Рассчет стоимости
+
+     # Получаем текущий курс юаня к рублю из БД
+    cny_to_rub = await db.get_exchange_rate("cny_to_rub")
+    if cny_to_rub is None:
+        logging.error("Не удалось получить курс юаня из БД.")
+        await callback_query.message.answer("Не удалось получить курс юаня из БД.")
+        await state.clear()
+        await callback_query.answer()
+        return None
+     # Получаем стоимость доставки в юанях из БД
+    delivery_price_rub = await db.get_delivery_price(category, delivery_method)
+    if delivery_price_rub is None:
+        await callback_query.message.answer("Не удалось получить курс юаня из БД.")
+        await state.clear()
+        await callback_query.answer()
+        logging.error(f"Не удалось получить цену доставки для категории '{category}' и типа '{delivery_method}' из БД.")
+        return None
+
+    price_rub = price * float(cny_to_rub)
+    total_price =  price_rub + delivery_price_rub#Рассчет стоимости
 
     confirmation_message = f"ПОДТВЕРЖДЕНИ ЗАКАЗА\n" \
-                           f"ФИО: {user_data['full_name']}\n" \
-                           f"Контакт: {user_data['phone_number']}\n" \
-                           f"Адрес: {user_data['address']}\n" \
-                           f"‍️ СОБРАННЫЕ ТОВАРЫ ‍️\n" \
-                           f"➀ Категория товара: {category}\n" \
-                           f"➁ Размер товара: {size}\n" \
-                           f"➂ Цвет товара: {color}\n" \
-                           f"➃ Ссылка на товар: {link}\n" \
-                           f"➄ Стоимость товара: {price:.2f}₽ - ({delivery_method})\n" \
-                           f"ОБЩАЯ СТОИМОСТЬ: {total_price:.2f}₽\n" \
-                           f"Мы выкупаем товар в течение 8 часов после оплаты. Если при выкупе цена изменится, с вами свяжется менеджер для доплаты или возврата средств.\n" \
-                           f"Если Вас устраивает, переведите сумму {total_price:.2f}₽ по номеру телефона через:\n" \
-                           f"️ Сбербанк или СБП\n" \
-                           f"️ 89111684777\n" \
-                           f"️ Алексей Александрович В.\n" \
-                           f"Осуществляя перевод, вы подтверждаете что корректно указали все данные заказа и согласны со сроками доставки. Мы не несем ответственности за соответствие размеров и брак. После оплаты нажмите кнопку 'Подтвердить оплату'"
+                        f"ФИО: {user_data['full_name']}\n" \
+                        f"Контакт: {user_data['phone_number']}\n" \
+                        f"Адрес: {user_data['address']}\n" \
+                        f"‍ВЫБРАННЫЕ ТОВАРЫ ‍\n" \
+                        f"➀ Категория товара: {category}\n" \
+                        f"➁ Размер товара: {size}\n" \
+                        f"➂ Цвет товара: {color}\n" \
+                        f"➃ Ссылка на товар: {link}\n" \
+                        f"➄ Стоимость товара: {price_rub:.2f}₽\n" \
+                        f"➅ Стоимость доставки ({delivery_method}): {delivery_price_rub}₽\n" \
+                        f"ОБЩАЯ СТОИМОСТЬ: {total_price:.2f}₽\n"\
+                        f"Мы выкупаем товар в течение 8 часов после оплаты. Если при выкупе цена изменится, с вами свяжется менеджер для доплаты или возврата средств.\n" \
+                        f"Если Вас устраивает, переведите сумму {total_price:.2f}₽ по номеру телефона через:\n" \
+                        f"️ Сбербанк или СБП\n" \
+                        f"️ 89111684777\n" \
+                        f"️ Алексей Александрович В.\n" \
+                        f"Осуществляя перевод, вы подтверждаете что корректно указали все данные заказа и согласны со сроками доставки. Мы не несем ответственности за соответствие размеров и брак. После оплаты нажмите кнопку 'Подтвердить оплату'"
 
     await callback_query.message.answer(confirmation_message, reply_markup=confirmation_keyboard)
     await callback_query.answer()
@@ -268,19 +318,39 @@ async def back_to_cart(callback_query: CallbackQuery, state: FSMContext, db: Dat
     link = data.get('link', 'Не указано')
     price = data.get('price', 'Не указано')
     delivery_method = data.get('delivery_method', 'Не указано')
-    total_price = price * get_currency_cny() #Рассчет стоимости
+    # Получаем текущий курс юаня к рублю из БД
+    cny_to_rub = await db.get_exchange_rate("cny_to_rub")
+    if cny_to_rub is None:
+        logging.error("Не удалось получить курс юаня из БД.")
+        await callback_query.message.answer("Не удалось получить курс юаня из БД.")
+        await state.clear()
+        await callback_query.answer()
+        return None
+    
+    # Получаем стоимость доставки в юанях из БД
+    delivery_price_rub = await db.get_delivery_price(category, delivery_method)
+    if delivery_price_rub is None:
+        await callback_query.message.answer("Не удалось получить курс юаня из БД.")
+        await state.clear()
+        await callback_query.answer()
+        logging.error(f"Не удалось получить цену доставки для категории '{category}' и типа '{delivery_method}' из БД.")
+        return None
 
-    cart_message = f"️ КОРЗИНА ЗАКАЗОВ ️\n" \
-                   f"ФИО: {user_data['full_name']}\n" \
-                   f"Контакт: {user_data['phone_number']}\n" \
-                   f"Адрес: {user_data['address']}\n" \
-                   f"‍️ ВЫБРАННЫЕ ТОВАРЫ ‍️\n" \
-                   f"➀ Категория товара: {category}\n" \
-                   f"➁ Размер товара: {size}\n" \
-                   f"➂ Цвет товара: {color}\n" \
-                   f"➃ Ссылка на товар: {link}\n" \
-                   f"➄ Стоимость товара: {price:.2f}₽ - ({delivery_method})\n" \
-                   f"ОБЩАЯ СТОИМОСТЬ: {total_price:.2f}₽\n" \
+    price_rub = price * float(cny_to_rub)
+    total_price =  price_rub + delivery_price_rub#Рассчет стоимости
+
+    cart_message = f"️КОРЗИНА ЗАКАЗОВ \n" \
+                    f"ФИО: {user_data['full_name']}\n" \
+                    f"Контакт: {user_data['phone_number']}\n" \
+                    f"Адрес: {user_data['address']}\n" \
+                    f"‍ВЫБРАННЫЕ ТОВАРЫ ‍\n" \
+                    f"➀ Категория товара: {category}\n" \
+                    f"➁ Размер товара: {size}\n" \
+                    f"➂ Цвет товара: {color}\n" \
+                    f"➃ Ссылка на товар: {link}\n" \
+                    f"➄ Стоимость товара: {price_rub:.2f}₽\n" \
+                    f"➅ Стоимость доставки ({delivery_method}): {delivery_price_rub}₽\n" \
+                    f"ОБЩАЯ СТОИМОСТЬ: {total_price:.2f}₽\n"
 
     await callback_query.message.answer(cart_message, reply_markup=cart_keyboard)
     await callback_query.answer()

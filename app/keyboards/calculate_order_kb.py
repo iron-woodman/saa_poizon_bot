@@ -24,41 +24,70 @@ retail_category_keyboard = InlineKeyboardMarkup(inline_keyboard=[
 
 
 
-async def get_category_keyboard():
-    """Создает inline-клавиатуру с заданными категориями."""
+# async def get_category_keyboard():
+#     """Создает inline-клавиатуру с заданными категориями."""
 
-    buttons = [
-        InlineKeyboardButton(text="Одежда", callback_data="clothes"),
-        InlineKeyboardButton(text="Верхняя одежда", callback_data="outerwear"),
-        InlineKeyboardButton(text="Нижнее белье", callback_data="underwear"),
-        InlineKeyboardButton(text="Летняя обувь", callback_data="summer_shoes"),
-        InlineKeyboardButton(text="Зимняя обувь", callback_data="winter_shoes"),
-        InlineKeyboardButton(text="Кошельки и сумки", callback_data="small_bags"),
-        InlineKeyboardButton(text="Парфюм", callback_data="perfume"),
-        InlineKeyboardButton(text="Большие сумки", callback_data="big_bags"),
-    ]
+#     buttons = [
+#         InlineKeyboardButton(text="Одежда", callback_data="clothes"),
+#         InlineKeyboardButton(text="Верхняя одежда", callback_data="outerwear"),
+#         InlineKeyboardButton(text="Нижнее белье", callback_data="underwear"),
+#         InlineKeyboardButton(text="Летняя обувь", callback_data="summer_shoes"),
+#         InlineKeyboardButton(text="Зимняя обувь", callback_data="winter_shoes"),
+#         InlineKeyboardButton(text="Кошельки и сумки", callback_data="small_bags"),
+#         InlineKeyboardButton(text="Парфюм", callback_data="perfume"),
+#         InlineKeyboardButton(text="Большие сумки", callback_data="big_bags"),
+#     ]
 
-    # Кнопка "Уточнить другие товары?" на всю ширину
-    other_products_button = InlineKeyboardButton(text="Уточнить другие товары?", 
-                                                 callback_data="other_products")
+#     # Кнопка "Уточнить другие товары?" на всю ширину
+#     other_products_button = InlineKeyboardButton(text="Уточнить другие товары?", 
+#                                                  callback_data="other_products")
 
-    # Кнопки "Назад" и "Отмена"
-    back_button = InlineKeyboardButton(text="⬅️ Назад", callback_data="order_type_back")
-    cancel_button = InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")
+#     # Кнопки "Назад" и "Отмена"
+#     back_button = InlineKeyboardButton(text="⬅️ Назад", callback_data="order_type_back")
+#     cancel_button = InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")
 
 
-    # Разделяем основные кнопки на ряды по row_width
-    row_width = 2
-    keyboard_rows = [buttons[i:i + row_width] for i in range(0, len(buttons), row_width)]
+#     # Разделяем основные кнопки на ряды по row_width
+#     row_width = 2
+#     keyboard_rows = [buttons[i:i + row_width] for i in range(0, len(buttons), row_width)]
 
-    # Добавляем кнопку "Уточнить другие товары?" в отдельный ряд
-    keyboard_rows.append([other_products_button])
+#     # Добавляем кнопку "Уточнить другие товары?" в отдельный ряд
+#     keyboard_rows.append([other_products_button])
 
-    # Добавляем кнопки "Назад" и "Отмена" в один ряд
-    keyboard_rows.append([back_button, cancel_button])
+#     # Добавляем кнопки "Назад" и "Отмена" в один ряд
+#     keyboard_rows.append([back_button, cancel_button])
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
-    return keyboard
+#     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
+#     return keyboard
+
+
+# Клавиатура категорий товаров (сгруппировано в 2 столбца)
+calculate_category_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+    [
+        InlineKeyboardButton(text="👚 Одежда", callback_data="calcualte_category:Одежда"),
+        InlineKeyboardButton(text="🧥 Верхняя одежда", callback_data="calculate_category:Верхняя одежда")
+    ],
+    [
+        InlineKeyboardButton(text="🩲 Нижнее белье", callback_data="calculate_category:Нижнее белье"),
+        InlineKeyboardButton(text="🩴 Летняя обувь", callback_data="calculate_category:Летняя обувь")
+    ],
+    [
+        InlineKeyboardButton(text="🥾 Зимняя обувь", callback_data="calculate_category:Зимняя обувь"),
+        InlineKeyboardButton(text="💼 Кошельки", callback_data="calculate_category:Кошельки")
+    ],
+    [
+        InlineKeyboardButton(text="🌸 Парфюм", callback_data="calculate_category:Парфюм"),
+        InlineKeyboardButton(text="👜 Большие сумки", callback_data="calculate_category:Большие сумки")
+    ],
+    [
+        InlineKeyboardButton(text="Уточнить другие товары?", callback_data="other_products")
+    ],
+    [
+        InlineKeyboardButton(text="⬅️ Назад", callback_data="order_type_back"),
+        InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")
+    ],
+
+])
 
 
 order_management_keyboard = InlineKeyboardMarkup(
@@ -77,16 +106,16 @@ order_management_keyboard = InlineKeyboardMarkup(
 
 
 
-delivery_type_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="🚛 Автоэкспресс", callback_data="express_delivery"),
-            InlineKeyboardButton(text="✈️ Авиаэкспресс", callback_data="air_delivery"),
-        ],
-        [
-            InlineKeyboardButton(text="⬅️ Назад", callback_data="back"),
-            InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
-        ]
-    ])
+# delivery_type_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+#         [
+#             InlineKeyboardButton(text="🚛 Автоэкспресс", callback_data="express_delivery"),
+#             InlineKeyboardButton(text="✈️ Авиаэкспресс", callback_data="air_delivery"),
+#         ],
+#         [
+#             InlineKeyboardButton(text="⬅️ Назад", callback_data="back"),
+#             InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
+#         ]
+#     ])
 
 registration_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [

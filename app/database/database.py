@@ -10,10 +10,10 @@ import string
 import logging  # Импортируем модуль logging
 import sqlalchemy
 
-from app.database.models import User, Order, Base, DATABASE_URL
+from app.database.models import User, Order, Base, DATABASE_URL, ExchangeRate, DeliveryPrice
 
 # --- Настройка логирования ---
-logging.basicConfig(filename="fin_bot.log", level=logging.ERROR, 
+logging.basicConfig(filename="fin_bot.log", level=logging.ERROR,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- Асинхронные методы работы с БД ---
@@ -34,14 +34,14 @@ class Database:
 
     async def get_async_session(self) -> AsyncSession:
         return self.async_session_maker()
-    
+
     async def generate_unique_code_for_order(self) -> str:
         """Generates a unique order code in the range A001-Z999."""
         try:
             async with await self.get_async_session() as session:
                 query = select(Order.order_code).distinct()
                 result = await session.execute(query)
-                existing_codes =  [row[0] for row in result.all()]
+                existing_codes = [row[0] for row in result.all()]
 
                 for letter in string.ascii_uppercase:
                     for number in range(1, 1000):
@@ -53,10 +53,12 @@ class Database:
             logging.error(f"Error generating unique code for order: {e}")
             raise
 
-    async def add_user(self, tg_id: int,  full_name: str, phone_number: str, main_address: str, unique_code:str) -> User:
+    async def add_user(self, tg_id: int, full_name: str, phone_number: str, main_address: str,
+                       unique_code: str) -> User:
         try:
             async with await self.get_async_session() as session:
-                user = User(tg_id=tg_id, full_name=full_name, phone_number=phone_number, main_address=main_address, unique_code=unique_code)
+                user = User(tg_id=tg_id, full_name=full_name, phone_number=phone_number, main_address=main_address,
+                            unique_code=unique_code)
                 session.add(user)
                 await session.commit()
                 return user
@@ -82,27 +84,25 @@ class Database:
         except Exception as e:
             logging.error(f"Error getting user by id: {e}")
             raise
-        
 
     async def get_user_by_tg_id(self, tg_id: int) -> Optional[User]:
         try:
             async with await self.get_async_session() as session:
                 stmt = select(User).where(User.tg_id == tg_id)
                 result = await session.execute(stmt)
-                user = result.scalar_one_or_none() # Возвращает один объект User или None
+                user = result.scalar_one_or_none()  # Возвращает один объект User или None
                 return user
         except Exception as e:
             logging.error(f"Error getting user by tg_id: {e}")
             raise
 
-
-    async def add_order(self, user_id: int, category: str, size: str, color: str, link: str, 
-                        price: float,delivery_method: str, total_price:float, order_code: str,
+    async def add_order(self, user_id: int, category: str, size: str, color: str, link: str,
+                        price: float, delivery_method: str, total_price: float, order_code: str,
                         promocode: Optional[str] = None) -> Order:
         try:
             async with await self.get_async_session() as session:
-                order = Order(user_id=user_id, category=category, size=size, color=color, link=link, 
-                              price=price, delivery_method=delivery_method, total_price=total_price, 
+                order = Order(user_id=user_id, category=category, size=size, color=color, link=link,
+                              price=price, delivery_method=delivery_method, total_price=total_price,
                               promocode=promocode, order_code=order_code)
                 session.add(order)
                 await session.commit()
@@ -124,18 +124,18 @@ class Database:
     async def get_order_by_id(self, order_id: int) -> Optional[Order]:
         try:
             async with await self.get_async_session() as session:
-                 order = await session.get(Order, order_id)
-                 return order
+                order = await session.get(Order, order_id)
+                return order
         except Exception as e:
             logging.error(f"Error getting order by id: {e}")
             raise
-        
+
     async def get_order_by_code(self, order_code: str) -> Optional[Order]:
         try:
             async with await self.get_async_session() as session:
-                 result = await session.execute(select(Order).where(Order.order_code == order_code))
-                 order = result.scalars().first()
-                 return order
+                result = await session.execute(select(Order).where(Order.order_code == order_code))
+                order = result.scalars().first()
+                return order
         except Exception as e:
             logging.error(f"Error getting order by code: {e}")
             raise
@@ -162,7 +162,6 @@ class Database:
                 await session.rollback()
             return False
 
-
     async def save_payment_screenshot(self, order_id: str, file_path: str):
         try:
             async with await self.get_async_session() as session:
@@ -176,7 +175,8 @@ class Database:
             logging.error(f"Error saving payment screenshot: {e}")
             raise
 
-    async def update_order_tracking_info(self, order_id: int, tracking_number: str, estimated_delivery: datetime.datetime):
+    async def update_order_tracking_info(self, order_id: int, tracking_number: str,
+                                           estimated_delivery: datetime.datetime):
         try:
             async with await self.get_async_session() as session:
                 order = await session.get(Order, order_id)
@@ -189,13 +189,12 @@ class Database:
         except Exception as e:
             logging.error(f"Error updating order tracking info: {e}")
             raise
-            
+
     async def get_all_orders_by_tg_id(self, tg_id: int) -> List[Order]:
         """
         Извлекает из базы данных все заказы пользователя по его telegram_id.
 
         Args:
-            db: Сессия базы данных SQLAlchemy.
             tg_id: Telegram ID пользователя.
 
         Returns:
@@ -217,7 +216,6 @@ class Database:
         Извлекает из базы данных все активные заказы пользователя по его telegram_id.
 
         Args:
-            db: Сессия базы данных SQLAlchemy.
             tg_id: Telegram ID пользователя.
 
         Returns:
@@ -232,7 +230,8 @@ class Database:
         # Фильтруем по tg_id пользователя и статусу заказа
         try:
             async with await self.get_async_session() as session:
-                stmt = select(Order).join(User, User.id == Order.user_id).where(User.tg_id == tg_id, Order.status.in_(active_statuses))
+                stmt = select(Order).join(User, User.id == Order.user_id).where(User.tg_id == tg_id,
+                                                                                   Order.status.in_(active_statuses))
                 result = await session.execute(stmt)
 
             # Возвращаем список объектов Order
@@ -241,13 +240,91 @@ class Database:
             logging.error(f"Error getting active orders by tg_id: {e}")
             raise
 
+    # ----------------------------------------------------------
+    # Методы для работы с курсом валют и ценами доставки
+    # ----------------------------------------------------------
+
+    async def add_or_update_exchange_rate(self, rate_name: str, rate_value: float):
+        """Adds or updates an exchange rate in the database."""
+        try:
+            async with await self.get_async_session() as session:
+                # Check if the rate already exists
+                existing_rate = await session.execute(
+                    select(ExchangeRate).where(ExchangeRate.rate_name == rate_name)
+                )
+                existing_rate = existing_rate.scalar_one_or_none()
+
+                if existing_rate:
+                    # Update existing rate
+                    existing_rate.rate_value = rate_value
+                else:
+                    # Add new rate
+                    new_rate = ExchangeRate(rate_name=rate_name, rate_value=rate_value)
+                    session.add(new_rate)
+                await session.commit()
+        except Exception as e:
+            logging.error(f"Error adding/updating exchange rate: {e}")
+            if session.in_transaction():
+                await session.rollback()
+            raise
+
+    async def get_exchange_rate(self, rate_name: str) -> Optional[float]:
+        """Retrieves an exchange rate from the database by name."""
+        try:
+            async with await self.get_async_session() as session:
+                result = await session.execute(
+                    select(ExchangeRate.rate_value).where(ExchangeRate.rate_name == rate_name)
+                )
+                rate_value = result.scalar_one_or_none()
+                return rate_value
+        except Exception as e:
+            logging.error(f"Error getting exchange rate: {e}")
+            raise
+
+    async def add_or_update_delivery_price(self, category: str, delivery_type: str, price: float):
+        """Adds or updates a delivery price in the database."""
+        try:
+            async with await self.get_async_session() as session:
+                # Check if the price already exists
+                existing_price = await session.execute(
+                    select(DeliveryPrice).where(DeliveryPrice.category == category,
+                                                DeliveryPrice.delivery_type == delivery_type)
+                )
+                existing_price = existing_price.scalar_one_or_none()
+
+                if existing_price:
+                    # Update existing price
+                    existing_price.price = price
+                else:
+                    # Add new price
+                    new_price = DeliveryPrice(category=category, delivery_type=delivery_type, price=price)
+                    session.add(new_price)
+                await session.commit()
+        except Exception as e:
+            logging.error(f"Error adding/updating delivery price: {e}")
+            if session.in_transaction():
+                await session.rollback()
+            raise
+
+    async def get_delivery_price(self, category: str, delivery_type: str) -> Optional[float]:
+        """Retrieves a delivery price from the database."""
+        try:
+            async with await self.get_async_session() as session:
+                result = await session.execute(
+                    select(DeliveryPrice.price).where(DeliveryPrice.category == category,
+                                                        DeliveryPrice.delivery_type == delivery_type)
+                )
+                price = result.scalar_one_or_none()
+                return price
+        except Exception as e:
+            logging.error(f"Error getting delivery price: {e}")
+            raise
 
     async def close(self):
         try:
             await self.engine.dispose()
         except Exception as e:
             logging.error(f"Error closing database connection: {e}")
-
 # --- Пример использования ---
 
 async def main():

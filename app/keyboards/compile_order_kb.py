@@ -3,28 +3,28 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 # Клавиатура категорий товаров (сгруппировано в 2 столбца)
 category_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [
-        InlineKeyboardButton(text="👚 Одежда", callback_data="category:одежда"),
-        InlineKeyboardButton(text="🧥 Верхняя одежда", callback_data="category:верхняя_одежда")
+        InlineKeyboardButton(text="👚 Одежда", callback_data="category:Одежда"),
+        InlineKeyboardButton(text="🧥 Верхняя одежда", callback_data="category:Верхняя одежда")
     ],
     [
-        InlineKeyboardButton(text="🩲 Нижнее белье", callback_data="category:нижнее_белье"),
-        InlineKeyboardButton(text="🩴 Летняя обувь", callback_data="category:летняя_обувь")
+        InlineKeyboardButton(text="🩲 Нижнее белье", callback_data="category:Нижнее белье"),
+        InlineKeyboardButton(text="🩴 Летняя обувь", callback_data="category:Летняя обувь")
     ],
     [
-        InlineKeyboardButton(text="🥾 Зимняя обувь", callback_data="category:зимняя_обувь"),
-        InlineKeyboardButton(text="💼 Кошельки", callback_data="category:кошельки")
+        InlineKeyboardButton(text="🥾 Зимняя обувь", callback_data="category:Зимняя обувь"),
+        InlineKeyboardButton(text="💼 Кошельки", callback_data="category:Кошельки")
     ],
     [
-        InlineKeyboardButton(text="🌸 Парфюм", callback_data="category:парфюм"),
-        InlineKeyboardButton(text="👜 Большие сумки", callback_data="category:большие_сумки")
+        InlineKeyboardButton(text="🌸 Парфюм", callback_data="category:Парфюм"),
+        InlineKeyboardButton(text="👜 Большие сумки", callback_data="category:Большие cумки")
     ],
 ])
 
 # Клавиатура выбора способа доставки
 delivery_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [
-        InlineKeyboardButton(text="🚛 Автоэкспресс", callback_data="delivery:автоэкспресс"),
-        InlineKeyboardButton(text="✈️ Авиаэкспресс", callback_data="delivery:авиаэкспресс")
+        InlineKeyboardButton(text="🚛 Автоэкспресс", callback_data="delivery:Автоэкспресс"),
+        InlineKeyboardButton(text="✈️ Авиаэкспресс", callback_data="delivery:Авиаэкспресс")
     ],
     [
         InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_size"),

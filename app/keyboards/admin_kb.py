@@ -7,6 +7,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 admin_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="Активные заказы 📦", callback_data="active_orders")],
     [InlineKeyboardButton(text="Все заказы 🧾", callback_data="all_orders")],
+    [InlineKeyboardButton(text="Загрузить цены 📤", callback_data="update_prices")],
 ])
 
 # Клавиатура статусов заказа (для изменения статуса)

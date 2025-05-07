@@ -1,15 +1,19 @@
 import datetime
+import logging
 from aiogram.fsm.state import State, StatesGroup
 from aiogram import types, F, Router, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (ReplyKeyboardRemove, CallbackQuery, InlineKeyboardButton, 
                            InlineKeyboardMarkup, FSInputFile)
 from app.keyboards.main_kb import main_keyboard
-from app.keyboards.calculate_order_kb import (order_type_keyboard, get_category_keyboard, 
+from app.keyboards.calculate_order_kb import (order_type_keyboard, calculate_category_keyboard, 
                                               registration_keyboard)
-from app.utils.currency import get_currency_cny
+# from app.utils.currency import get_currency_cny
 from app.config import MANAGER_TELEGRAM_ID
+from app.database.database import Database
 
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
 
 router = Router()
 
@@ -36,8 +40,7 @@ async def process_order_type(callback_query: CallbackQuery, state: FSMContext):
     await state.update_data(order_type=order_type)
     await callback_query.message.answer("Вы выбрали розничный расчет!")
     
-    keyboard = await get_category_keyboard()
-    await callback_query.message.answer("Выберите категорию товара:", reply_markup=keyboard)
+    await callback_query.message.answer("Выберите категорию товара:", reply_markup=calculate_category_keyboard)
     await state.set_state(OrderState.choosing_good)
     await callback_query.answer()
 
@@ -84,17 +87,26 @@ async def send_shipping_cost_document(callback_query: CallbackQuery, bot: Bot):
 
 
 
-@router.callback_query(OrderState.choosing_good, F.data.in_([
-    "clothes", "outerwear", "underwear", "summer_shoes", "winter_shoes",
-    "small_bags", "big_bags", "perfume", "other_products"
-]))
-async def process_good_type(callback_query: CallbackQuery, state: FSMContext):
-    good_type = callback_query.data
+@router.callback_query(OrderState.choosing_good, F.data.startswith("calculate_category:"))
+async def process_good_type(callback_query: CallbackQuery, state: FSMContext, db: Database):
+    good_type = callback_query.data.split(":")[1]
     await state.update_data(good_type=good_type)
+
+ # Получаем текущий курс юаня к рублю из БД
+    cny_to_rub = await db.get_exchange_rate("cny_to_rub")
+    if cny_to_rub is None:
+        logging.error("Не удалось получить курс юаня из БД.")
+        await callback_query.message.answer("Не удалось получить курс юаня из БД.")
+        await state.clear()
+        await callback_query.answer()
+        return None
+    
+    await state.update_data(cny_to_rub=cny_to_rub)
+
     text = (
             "Введите сумму товара в CNY:\n\n"
             f"🇨🇳 Курс на сегодня ({datetime.datetime.now().strftime('%d.%m.%Y')}):\n"
-            f"👉 ¥1 = {get_currency_cny()} ₽\n"
+            f"👉 ¥1 = {cny_to_rub} ₽\n"
         )
 
     await callback_query.message.answer(text)
@@ -129,7 +141,7 @@ async def process_price(message: types.Message, state: FSMContext):
 
 
 @router.callback_query(OrderState.choosing_delivery, F.data.in_(['air_delivery', 'express_delivery']))
-async def process_delivery_type(callback_query: CallbackQuery, state: FSMContext):
+async def process_delivery_type(callback_query: CallbackQuery, state: FSMContext, db: Database):
     delivery_type = callback_query.data
     await state.update_data(delivery_type=delivery_type)
 
@@ -137,18 +149,37 @@ async def process_delivery_type(callback_query: CallbackQuery, state: FSMContext
     order_type = user_data.get('order_type')
     good_type = user_data.get('good_type')
     price = user_data.get('price')
+    cny_to_rub = user_data.get('cny_to_rub')
 
     if delivery_type == "air_delivery":
         delivery_name = "Авиаэкспресс"
     else:
         delivery_name = "Автоэкспресс"
 
+    
+    # Получаем стоимость доставки в юанях из БД
+    delivery_price_rub = await db.get_delivery_price(good_type, delivery_name)
+    if delivery_price_rub is None:
+        await callback_query.message.answer(
+            f"Не удалось получить стоимость доставки для категории '{good_type}' и типа '{delivery_name}' из БД.")
+        await state.clear()
+        await callback_query.answer()
+        logging.error(f"Не удалось получить цену доставки для категории '{good_type}' и типа '{delivery_name}' из БД.")
+        return None
+
+    price_rub = price * cny_to_rub
+    total_price = price_rub + delivery_price_rub
+
     # Create the final order information message
     order_info = (
         f"Тип заказа: {order_type}\n"
         f"Категория товара: {good_type}\n"
-        f"Сумма: {price} CNY\n"
-        f"Тип доставки: {delivery_name}"
+        f"Цена товара: {price} CNY\n"
+        f"Цена товара в рублях: {price_rub} руб.\n"
+        f"Тип доставки: {delivery_name}\n"
+        f"Стоимость доставки: {delivery_price_rub} руб.\n"
+        f"Итоговая стоимость: {total_price} руб.\n"
+
     )
 
     # Create the inline keyboard for post-order actions
