@@ -59,7 +59,7 @@ async def menu_button_handler(message: types.Message):
     )
 
 
-@router.message(F.text == "Помощь")
+@router.message(F.text.regexp(r".*Помощь.*"))
 async def help_handler(message: types.Message) -> None:
     """
     Этот обработчик вызывается при нажатии кнопки "Помощь".

@@ -94,7 +94,7 @@ class Database:
                 return user
         except Exception as e:
             logging.error(f"Error getting user by tg_id: {e}")
-            raise
+            return None
 
     async def add_order(self, user_id: int, category: str, size: str, color: str, link: str,
                         price: float, delivery_method: str, total_price: float, order_code: str,

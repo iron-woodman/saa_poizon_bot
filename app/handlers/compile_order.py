@@ -4,6 +4,7 @@ import datetime
 from aiogram import F, Router, Bot, types
 from aiogram.types import (Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, 
                            InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile)
+from aiogram.utils.markdown import hlink
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from app.config import MANAGER_TELEGRAM_ID, PAY_SCREENS_DIR  # Убедитесь, что у вас настроен MANAGER_TELEGRAM_ID
@@ -15,6 +16,7 @@ from app.keyboards.compile_order_kb import (delivery_keyboard, category_keyboard
 from app.keyboards.calculate_order_kb import registration_keyboard
 # from app.utils.currency import get_currency_cny
 from app.database.database import Database
+from app.config import PYMENT_CARD, PYMENT_PHONE, PYMENT_FIO
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 
@@ -42,7 +44,6 @@ async def start_order_assembly(callback_query: CallbackQuery, state: FSMContext,
     Обработчик нажатия на кнопку "Собрать заказ".
     """
     tg_id = callback_query.from_user.id
-    print(f'{tg_id=}')
     # Проверяем, существует ли пользователь с таким telegram ID
     existing_user = await db.get_user_by_tg_id(tg_id)  # Теперь используем db
     if not existing_user:  #Исправлено: если пользователя нет, то предлагаем зарегистрироваться.
@@ -185,10 +186,12 @@ async def process_delivery_method(callback_query: CallbackQuery, state: FSMConte
     # Получаем стоимость доставки в юанях из БД
     delivery_price_rub = await db.get_delivery_price(category, delivery_method)
     if delivery_price_rub is None:
-        await callback_query.message.answer("Не удалось получить курс юаня из БД.")
+        await callback_query.message.answer(
+            f"Не удалось получить стоимость доставки для категории '{category}' и типа '{delivery_method}' из БД.")
         await state.clear()
         await callback_query.answer()
-        logging.error(f"Не удалось получить цену доставки для категории '{category}' и типа '{delivery_method}' из БД.")
+        logging.error(
+            f"Не удалось получить цену доставки для категории '{category}' и типа '{delivery_method}' из БД.")
         return None
 
     price_rub = price * float(cny_to_rub)
@@ -288,9 +291,9 @@ async def process_continue_checkout(callback_query: CallbackQuery, state: FSMCon
                         f"ОБЩАЯ СТОИМОСТЬ: {total_price:.2f}₽\n"\
                         f"Мы выкупаем товар в течение 8 часов после оплаты. Если при выкупе цена изменится, с вами свяжется менеджер для доплаты или возврата средств.\n" \
                         f"Если Вас устраивает, переведите сумму {total_price:.2f}₽ по номеру телефона через:\n" \
-                        f"️ Сбербанк или СБП\n" \
-                        f"️ 89111684777\n" \
-                        f"️ Алексей Александрович В.\n" \
+                        f"️ Сбербанк карта {PYMENT_CARD} \n" \
+                        f"️ или СБП: {PYMENT_PHONE}\n" \
+                        f"️ {PYMENT_FIO}\n" \
                         f"Осуществляя перевод, вы подтверждаете что корректно указали все данные заказа и согласны со сроками доставки. Мы не несем ответственности за соответствие размеров и брак. После оплаты нажмите кнопку 'Подтвердить оплату'"
 
     await callback_query.message.answer(confirmation_message, reply_markup=confirmation_keyboard)
@@ -392,13 +395,21 @@ async def process_payment_screenshot(message: Message, state: FSMContext, bot: B
 
         await message.answer("Скриншот оплаты получен и отправлен на проверку.\nОжидайте подтверждения от менеджера.")
 
+
+        user_id = message.from_user.id
+        username = message.from_user.username
+        full_name = message.from_user.full_name
+
+        # 1. Ссылка Markdown (лучший вариант)
+        user_link_md = hlink(full_name, f"tg://user?id={user_id}")
+
         # Отправляем скриншот менеджеру (пример)
         await bot.send_photo(
-    # chat_id=MANAGER_TELEGRAM_ID,
-    chat_id=980992117,
+    chat_id=MANAGER_TELEGRAM_ID,
     photo=FSInputFile(full_file_path),
-    caption=f"Новый скриншот оплаты от {message.from_user.full_name} ({message.from_user.id})"
+    caption=f"Новый скриншот оплаты от {user_link_md}"
     )
+        await message.reply("Информация о вашей оплате отправлена менеджеру.")  #
         user = await db.get_user_by_tg_id(message.from_user.id)
         active_orders = await db.get_active_orders_by_tg_id(user.tg_id)
         order = active_orders[-1] #Берем последний заказ, так как он актуальный

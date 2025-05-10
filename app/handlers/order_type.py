@@ -81,7 +81,8 @@ async def process_order_type(callback_query: CallbackQuery, state: FSMContext):
 async def send_shipping_cost_document(callback_query: CallbackQuery, bot: Bot):
     """Sends the shipping cost document to the user."""
     document = FSInputFile("data/IR1047.xlsx") # REPLACE with correct path
-    await bot.send_document(callback_query.from_user.id, document=document, caption="Шаблон для расчета стоимости доставки и упаковки")
+    await bot.send_document(callback_query.from_user.id, document=document, 
+                            caption="Шаблон для расчета стоимости доставки и упаковки")
     await callback_query.answer() # Acknowledge callback
 
 
@@ -105,7 +106,7 @@ async def process_good_type(callback_query: CallbackQuery, state: FSMContext, db
 
     text = (
             "Введите сумму товара в CNY:\n\n"
-            f"🇨🇳 Курс на сегодня ({datetime.datetime.now().strftime('%d.%m.%Y')}):\n"
+            f"Курс на сегодня ({datetime.datetime.now().strftime('%d.%m.%Y')}):\n"
             f"👉 ¥1 = {cny_to_rub} ₽\n"
         )
 
@@ -207,11 +208,21 @@ async def process_new_order(callback_query: CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(F.data == "confirm_order")
-async def process_confirm_order(callback_query: CallbackQuery, state: FSMContext):
-    # Implement order confirmation logic here (e.g., send order details to admin, etc.)
-    await callback_query.message.answer(
+async def process_confirm_order(callback_query: CallbackQuery, state: FSMContext, db: Database):
+
+    tg_id = callback_query.from_user.id
+    # Проверяем, существует ли пользователь с таким telegram ID
+    existing_user = await db.get_user_by_tg_id(tg_id)  # Теперь используем db
+    if not existing_user:  #Исправлено: если пользователя нет, то предлагаем зарегистрироваться.
+         # Implement order confirmation logic here (e.g., send order details to admin, etc.)
+         await callback_query.message.answer(
         "Для начала необходимо пройти простую процедуру регистрации в системе.",
           reply_markup=registration_keyboard)
+    else:
+         await callback_query.message.answer(
+        "Вы уже зарегистрированы в системе и можете оформить заказ.",
+          reply_markup=main_keyboard)
+   
     await state.clear()  # Clear state after order confirmation
     await callback_query.answer()
 
