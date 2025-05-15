@@ -18,7 +18,7 @@ from app.keyboards.calculate_order_kb import registration_keyboard
 from app.database.database import Database
 from app.config import PYMENT_CARD, PYMENT_PHONE, PYMENT_FIO
 # Настройка логирования
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, encoding='utf-8')
 
 # Создаем роутер
 router = Router()
@@ -268,7 +268,6 @@ async def process_continue_checkout(callback_query: CallbackQuery, state: FSMCon
      # Получаем стоимость доставки в юанях из БД
     delivery_price_rub = await db.get_delivery_price(category, delivery_method)
     if delivery_price_rub is None:
-        await callback_query.message.answer("Не удалось получить курс юаня из БД.")
         await state.clear()
         await callback_query.answer()
         logging.error(f"Не удалось получить цену доставки для категории '{category}' и типа '{delivery_method}' из БД.")
@@ -333,7 +332,6 @@ async def back_to_cart(callback_query: CallbackQuery, state: FSMContext, db: Dat
     # Получаем стоимость доставки в юанях из БД
     delivery_price_rub = await db.get_delivery_price(category, delivery_method)
     if delivery_price_rub is None:
-        await callback_query.message.answer("Не удалось получить курс юаня из БД.")
         await state.clear()
         await callback_query.answer()
         logging.error(f"Не удалось получить цену доставки для категории '{category}' и типа '{delivery_method}' из БД.")
@@ -448,7 +446,7 @@ async def process_promocode(message: Message, state: FSMContext):
     """
     promocode = message.text
     # TODO: Добавить логику проверки промокода и применения скидки
-    await message.answer(f"Промокод '{promocode}' принят.\n(Функциональность применения скидки не реализована)")
+    await message.answer(f"Промокод '{promocode}' не корректный или устарел.")
     await state.clear()  # Сбрасываем состояние
 
 @router.callback_query(F.data == "add_another_item")

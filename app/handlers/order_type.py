@@ -13,7 +13,7 @@ from app.config import MANAGER_TELEGRAM_ID
 from app.database.database import Database
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, encoding='utf-8')
 
 router = Router()
 

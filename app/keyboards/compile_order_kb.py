@@ -16,7 +16,7 @@ category_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     ],
     [
         InlineKeyboardButton(text="🌸 Парфюм", callback_data="category:Парфюм"),
-        InlineKeyboardButton(text="👜 Большие сумки", callback_data="category:Большие cумки")
+        InlineKeyboardButton(text="👜 Большие сумки", callback_data="category:Большие сумки")
     ],
 ])
 

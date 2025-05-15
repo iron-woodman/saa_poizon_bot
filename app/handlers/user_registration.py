@@ -17,7 +17,7 @@ class UserProfileData(StatesGroup):
     waiting_for_address = State()
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, encoding='utf-8')
 
 router = Router()
 
@@ -60,13 +60,14 @@ async def register_phone_number(message: Message, state: FSMContext):
 
 
 @router.message(UserProfileData.waiting_for_address)
-async def register_user_status(message: Message, state: FSMContext, bot: Bot): # Добавляем bot: Bot в аргументы
+async def register_user_status(message: Message, state: FSMContext, bot: Bot, db: Database): # Добавляем bot: Bot в аргументы
     address = message.text
     await state.update_data(address=address)
     data = await state.get_data()
     try:
         data['tg_id'] = message.from_user.id
-        data['unique_code'] = 'A001'  # уникальный номер отправления.  Лучше генерировать уникальный код.
+        
+        data['unique_code'] = await db.generate_unique_code_for_user()
 
         # Добавляем пользователя в базу данных
         user = await db.add_user(

@@ -13,8 +13,8 @@ import sqlalchemy
 from app.database.models import User, Order, Base, DATABASE_URL, ExchangeRate, DeliveryPrice
 
 # --- Настройка логирования ---
-logging.basicConfig(filename="fin_bot.log", level=logging.ERROR,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(filename="poison_bot.log", level=logging.ERROR,
+                    format='%(asctime)s - %(levelname)s - %(message)s', encoding='utf-8')
 
 # --- Асинхронные методы работы с БД ---
 
@@ -40,6 +40,24 @@ class Database:
         try:
             async with await self.get_async_session() as session:
                 query = select(Order.order_code).distinct()
+                result = await session.execute(query)
+                existing_codes = [row[0] for row in result.all()]
+
+                for letter in string.ascii_uppercase:
+                    for number in range(1, 1000):
+                        code = f"{letter}{number:03}"
+                        if code not in existing_codes:
+                            return code
+                return None  # Handle the unlikely case of all codes being exhausted
+        except Exception as e:
+            logging.error(f"Error generating unique code for order: {e}")
+            raise
+
+    async def generate_unique_code_for_user(self) -> str:
+        """Generates a unique user code in the range A001-Z999."""
+        try:
+            async with await self.get_async_session() as session:
+                query = select(User.unique_code).distinct()
                 result = await session.execute(query)
                 existing_codes = [row[0] for row in result.all()]
 
