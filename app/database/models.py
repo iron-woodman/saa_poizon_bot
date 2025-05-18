@@ -85,4 +85,12 @@ class DeliveryPrice(Base):
 
     def __repr__(self):
         return f"<DeliveryPrice(category='{self.category}', delivery_type='{self.delivery_type}', price={self.price})>"
+    
+class PaymentDetails(Base):
+        __tablename__ = "payment_details"
+
+        id = Column(Integer, primary_key=True, index=True)
+        phone_number = Column(String, nullable=False)
+        card_number = Column(String, nullable=False)
+        FIO = Column(String, nullable=False)
 

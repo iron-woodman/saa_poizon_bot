@@ -19,10 +19,6 @@ SQLITE_FILE = os.getenv("SQLITE_FILE", "poizon_bot.db")
 ADMIN_IDS = [int(admin_id) for admin_id in os.getenv("ADMIN_TELEGRAM_IDS", "").split(",") if admin_id]
 MANAGER_TELEGRAM_ID = os.getenv("MANAGER_TELEGRAM_ID")
 
-PYMENT_PHONE = os.getenv("PYMENT_PHONE")
-PYMENT_CARD = os.getenv("PYMENT_CARD")
-PYMENT_FIO = os.getenv("PYMENT_FIO")
-
 
 # Создаем каталог для сохранения скриншотов, если его нет
 PAY_SCREENS_DIR = "pay_screens"

@@ -10,7 +10,7 @@ import string
 import logging  # Импортируем модуль logging
 import sqlalchemy
 
-from app.database.models import User, Order, Base, DATABASE_URL, ExchangeRate, DeliveryPrice
+from app.database.models import User, Order, Base, DATABASE_URL, ExchangeRate, DeliveryPrice, PaymentDetails  # Добавляем импорт PaymentDetails
 
 # --- Настройка логирования ---
 logging.basicConfig(filename="poison_bot.log", level=logging.ERROR,
@@ -338,11 +338,57 @@ class Database:
             logging.error(f"Error getting delivery price: {e}")
             raise
 
+    # ----------------------------------------------------------
+    # Методы для работы с параметрами оплаты
+    # ----------------------------------------------------------
+
+    async def add_or_update_payment_details(self, phone_number: str, card_number: str, FIO: str):
+        """Adds or updates payment details in the database."""
+        try:
+            async with await self.get_async_session() as session:
+                # Check if payment details already exist
+                existing_details = await session.execute(
+                    select(PaymentDetails).limit(1)  # Предполагаем, что запись параметров оплаты может быть только одна
+                )
+                existing_details = existing_details.scalar_one_or_none()
+
+                if existing_details:
+                    # Update existing details
+                    existing_details.phone_number = phone_number
+                    existing_details.card_number = card_number
+                    existing_details.FIO = FIO
+                else:
+                    # Add new details
+                    new_details = PaymentDetails(phone_number=phone_number, 
+                                                 card_number=card_number, 
+                                                 FIO=FIO)
+                    session.add(new_details)
+                await session.commit()
+        except Exception as e:
+            logging.error(f"Error adding/updating payment details: {e}")
+            if session.in_transaction():
+                await session.rollback()
+            raise
+
+    async def get_payment_details(self) -> Optional[PaymentDetails]:
+        """Retrieves payment details from the database."""
+        try:
+            async with await self.get_async_session() as session:
+                result = await session.execute(
+                    select(PaymentDetails).limit(1)  # Предполагаем, что запись параметров оплаты может быть только одна
+                )
+                payment_details = result.scalar_one_or_none()
+                return payment_details
+        except Exception as e:
+            logging.error(f"Error getting payment details: {e}")
+            raise
+
     async def close(self):
         try:
             await self.engine.dispose()
         except Exception as e:
             logging.error(f"Error closing database connection: {e}")
+
 # --- Пример использования ---
 
 async def main():
@@ -369,6 +415,14 @@ async def main():
         #Пример получения заказа по ID
         order_test = await db.get_order_by_id(order1.id)
         print(f"Order по ID: {order_test}")
+
+        # Пример добавления и получения параметров оплаты
+        await db.add_or_update_payment_details(phone_number="+79001112233", card_number="1234567890123456")
+        payment_details = await db.get_payment_details()
+        if payment_details:
+            print(f"Payment details: Phone: {payment_details.phone_number}, Card: {payment_details.card_number}")
+        else:
+            print("Payment details not found.")
 
     except Exception as e:
         print(f"An error occurred: {e}")

@@ -16,7 +16,6 @@ from app.keyboards.compile_order_kb import (delivery_keyboard, category_keyboard
 from app.keyboards.calculate_order_kb import registration_keyboard
 # from app.utils.currency import get_currency_cny
 from app.database.database import Database
-from app.config import PYMENT_CARD, PYMENT_PHONE, PYMENT_FIO
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, encoding='utf-8')
 
@@ -272,6 +271,9 @@ async def process_continue_checkout(callback_query: CallbackQuery, state: FSMCon
         await callback_query.answer()
         logging.error(f"Не удалось получить цену доставки для категории '{category}' и типа '{delivery_method}' из БД.")
         return None
+    
+
+    payment_details = await db.get_payment_details()
 
     price_rub = price * float(cny_to_rub)
     total_price =  price_rub + delivery_price_rub#Рассчет стоимости
@@ -287,12 +289,12 @@ async def process_continue_checkout(callback_query: CallbackQuery, state: FSMCon
                         f"➃ Ссылка на товар: {link}\n" \
                         f"➄ Стоимость товара: {price_rub:.2f}₽\n" \
                         f"➅ Стоимость доставки ({delivery_method}): {delivery_price_rub}₽\n" \
-                        f"ОБЩАЯ СТОИМОСТЬ: {total_price:.2f}₽\n"\
+                        f"ОБЩАЯ СТОИМОСТЬ: {total_price:.2f}₽\n\n"\
                         f"Мы выкупаем товар в течение 8 часов после оплаты. Если при выкупе цена изменится, с вами свяжется менеджер для доплаты или возврата средств.\n" \
-                        f"Если Вас устраивает, переведите сумму {total_price:.2f}₽ по номеру телефона через:\n" \
-                        f"️ Сбербанк карта {PYMENT_CARD} \n" \
-                        f"️ или СБП: {PYMENT_PHONE}\n" \
-                        f"️ {PYMENT_FIO}\n" \
+                        f"Если Вас все устраивает, переведите сумму {total_price:.2f}₽:\n" \
+                        f"️ Карта (Сбербанк): {payment_details.card_number} \n" \
+                        f"️ или СБП: {payment_details.phone_number}\n" \
+                        f"️ ФИО получателя: {payment_details.FIO}\n\n" \
                         f"Осуществляя перевод, вы подтверждаете что корректно указали все данные заказа и согласны со сроками доставки. Мы не несем ответственности за соответствие размеров и брак. После оплаты нажмите кнопку 'Подтвердить оплату'"
 
     await callback_query.message.answer(confirmation_message, reply_markup=confirmation_keyboard)

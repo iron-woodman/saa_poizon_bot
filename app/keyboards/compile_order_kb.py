@@ -35,7 +35,7 @@ delivery_keyboard = InlineKeyboardMarkup(inline_keyboard=[
 # Клавиатура корзины заказа
 cart_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="✅ Продолжить оформление", callback_data="continue_checkout")],
-    [InlineKeyboardButton(text="➕ Добавить товар", callback_data="add_another_item")],
+    # [InlineKeyboardButton(text="➕ Добавить товар", callback_data="add_another_item")],
     [InlineKeyboardButton(text="🗑️ Удалить товары", callback_data="remove_items")],
     [InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")],
 ])
