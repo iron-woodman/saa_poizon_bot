@@ -9,7 +9,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from app.config import MANAGER_TELEGRAM_ID, PAY_SCREENS_DIR  # Убедитесь, что у вас настроен MANAGER_TELEGRAM_ID
 from app.utils.regex import (normolize_phone_number, validate_international_phone_number_basic,
-                                  validate_full_name)
+                                  validate_full_name, 
+                                  validate_color, validate_price, validate_link, validate_size)
 from app.keyboards.compile_order_kb import (delivery_keyboard, category_keyboard, 
                                                   cart_keyboard, confirmation_keyboard, 
                                                   track_order_keyboard)
@@ -32,7 +33,7 @@ class OrderForm(StatesGroup):
     waiting_for_delivery_method = State()
     waiting_for_payment_screenshot = State() # Добавлено состояние для скриншота оплаты
     waiting_for_promocode = State()  # Добавлено состояние для промокода
-
+    cart_items = State() #Состояние для хранения товаров в корзине (список словарей)
 
 
 # --- Обработчики ---
@@ -57,6 +58,8 @@ async def start_order_assembly(callback_query: CallbackQuery, state: FSMContext,
             reply_markup=category_keyboard
         )
         await state.set_state(OrderForm.waiting_for_category)
+        # Инициализируем список товаров в корзине
+        await state.update_data(cart_items=[])
     await callback_query.answer()  # Отвечаем на callback, чтобы убрать часы
 
 
@@ -156,15 +159,7 @@ async def process_delivery_method(callback_query: CallbackQuery, state: FSMConte
     await state.update_data(delivery_method=delivery_method)
     await callback_query.message.answer(f"Вы выбрали способ доставки: {delivery_method}")
 
-    # Получаем данные пользователя
-    user = await db.get_user_by_tg_id(callback_query.from_user.id)
-    user_data = {
-        'full_name': user.full_name,
-        'phone_number': user.phone_number,
-        'address': user.main_address
-    } 
-
-    # Формируем сообщение для корзины
+    # Получаем данные из FSM
     data = await state.get_data()
     category = data.get('category', 'Не указано')
     size = data.get('size', 'Не указано')
@@ -173,44 +168,98 @@ async def process_delivery_method(callback_query: CallbackQuery, state: FSMConte
     price = data.get('price', 'Не указано')
     delivery_method = data.get('delivery_method', 'Не указано')
 
+    # Формируем словарь с информацией о товаре
+    item = {
+        'category': category,
+        'size': size,
+        'color': color,
+        'link': link,
+        'price': price,
+        'delivery_method': delivery_method
+    }
+
+    # Добавляем товар в корзину (в состояние)
+    cart_items = data.get('cart_items', [])
+    cart_items.append(item)
+    await state.update_data(cart_items=cart_items)
+
+    # Отображаем корзину
+    await display_cart(callback_query, state, db)
+    
+
+async def display_cart(callback_query: CallbackQuery, state: FSMContext, db: Database):
+    """
+    Функция для отображения корзины.
+    """
+
+    # Получаем данные пользователя
+    user = await db.get_user_by_tg_id(callback_query.from_user.id)
+    if not user:
+        await callback_query.message.answer("Пользователь не найден.")
+        return
+
+    user_data = {
+        'full_name': user.full_name,
+        'phone_number': user.phone_number,
+        'address': user.main_address
+    }
+
+    # Получаем данные из FSM
+    data = await state.get_data()
+    cart_items = data.get('cart_items', [])
+
+    # Если корзина пуста
+    if not cart_items:
+        await callback_query.message.answer("Ваша корзина пуста.")
+        return
+
+    # Формируем сообщение для корзины
+    cart_message = "️КОРЗИНА ЗАКАЗОВ \n" \
+                   f"ФИО: {user_data['full_name']}\n" \
+                   f"Контакт: {user_data['phone_number']}\n" \
+                   f"Адрес: {user_data['address']}\n" \
+                   f"‍ВЫБРАННЫЕ ТОВАРЫ ‍\n"
+
+    total_price_all_items = 0 #Переменная для хранения общей стоимости всех товаров
+
     # Получаем текущий курс юаня к рублю из БД
     cny_to_rub = await db.get_exchange_rate("cny_to_rub")
     if cny_to_rub is None:
         logging.error("Не удалось получить курс юаня из БД.")
         await callback_query.message.answer("Не удалось получить курс юаня из БД.")
         await state.clear()
-        await callback_query.answer()
         return None
     
-    # Получаем стоимость доставки в юанях из БД
-    delivery_price_rub = await db.get_delivery_price(category, delivery_method)
-    if delivery_price_rub is None:
-        await callback_query.message.answer(
-            f"Не удалось получить стоимость доставки для категории '{category}' и типа '{delivery_method}' из БД.")
-        await state.clear()
-        await callback_query.answer()
-        logging.error(
-            f"Не удалось получить цену доставки для категории '{category}' и типа '{delivery_method}' из БД.")
-        return None
+    # Добавляем информацию о каждом товаре
+    for i, item in enumerate(cart_items):
+        category = item.get('category', 'Не указано')
+        size = item.get('size', 'Не указано')
+        color = item.get('color', 'Не указано')
+        link = item.get('link', 'Не указано')
+        price = item.get('price', 'Не указано')
+        delivery_method = item.get('delivery_method', 'Не указано')
 
-    price_rub = price * float(cny_to_rub)
-    total_price =  price_rub + delivery_price_rub#Рассчет стоимости
+        # Получаем стоимость доставки для текущего товара
+        delivery_price_rub = await db.get_delivery_price(category, delivery_method)
+        if delivery_price_rub is None:
+           logging.error(f"Не удалось получить цену доставки для категории '{category}' и типа '{delivery_method}' из БД.")
+           delivery_price_rub = 0 #Устанавливаем значение по умолчанию
+        price_rub = price * float(cny_to_rub)
+        total_price = price_rub + delivery_price_rub
+        total_price_all_items += total_price #Считаем общую стоимость
+        cart_message += f"{i+1}. Категория: {category}, Размер: {size}, Цвет: {color}, Цена: {total_price:.2f}₽\n"
 
-    
-    cart_message = f"️КОРЗИНА ЗАКАЗОВ \n" \
-                    f"ФИО: {user_data['full_name']}\n" \
-                    f"Контакт: {user_data['phone_number']}\n" \
-                    f"Адрес: {user_data['address']}\n" \
-                    f"‍ВЫБРАННЫЕ ТОВАРЫ ‍\n" \
-                    f"➀ Категория товара: {category}\n" \
-                    f"➁ Размер товара: {size}\n" \
-                    f"➂ Цвет товара: {color}\n" \
-                    f"➃ Ссылка на товар: {link}\n" \
-                    f"➄ Стоимость товара: {price_rub:.2f}₽\n" \
-                    f"➅ Стоимость доставки ({delivery_method}): {delivery_price_rub}₽\n" \
-                    f"ОБЩАЯ СТОИМОСТЬ: {total_price:.2f}₽\n"
+    cart_message += f"ОБЩАЯ СТОИМОСТЬ ВСЕХ ТОВАРОВ: {total_price_all_items:.2f}₽\n"
 
-    await callback_query.message.answer(cart_message, reply_markup=cart_keyboard)
+    # Создаем inline-кнопки для удаления товаров
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🗑️ Удалить товар", callback_data="remove_items")], 
+        [InlineKeyboardButton(text="✅ Продолжить оформление", callback_data="continue_checkout")],
+        [InlineKeyboardButton(text="➕ Добавить товар", callback_data="add_another_item")],
+        [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_order")]
+    ])
+
+    await callback_query.message.answer(cart_message, reply_markup=keyboard)
     await callback_query.answer()
 
 @router.callback_query(F.data == "back_to_size")
@@ -247,81 +296,19 @@ async def process_continue_checkout(callback_query: CallbackQuery, state: FSMCon
         'address': user.main_address
     } 
 
-    # Формируем сообщение для подтверждения заказа
+    # Получаем данные из FSM
     data = await state.get_data()
-    category = data.get('category', 'Не указано')
-    size = data.get('size', 'Не указано')
-    color = data.get('color', 'Не указано')
-    link = data.get('link', 'Не указано')
-    price = data.get('price', 'Не указано')
-    delivery_method = data.get('delivery_method', 'Не указано')
+    cart_items = data.get('cart_items', [])
 
-     # Получаем текущий курс юаня к рублю из БД
-    cny_to_rub = await db.get_exchange_rate("cny_to_rub")
-    if cny_to_rub is None:
-        logging.error("Не удалось получить курс юаня из БД.")
-        await callback_query.message.answer("Не удалось получить курс юаня из БД.")
-        await state.clear()
-        await callback_query.answer()
-        return None
-     # Получаем стоимость доставки в юанях из БД
-    delivery_price_rub = await db.get_delivery_price(category, delivery_method)
-    if delivery_price_rub is None:
-        await state.clear()
-        await callback_query.answer()
-        logging.error(f"Не удалось получить цену доставки для категории '{category}' и типа '{delivery_method}' из БД.")
-        return None
-    
-
-    payment_details = await db.get_payment_details()
-
-    price_rub = price * float(cny_to_rub)
-    total_price =  price_rub + delivery_price_rub#Рассчет стоимости
-
+    # Формируем сообщение для подтверждения заказа
     confirmation_message = f"ПОДТВЕРЖДЕНИ ЗАКАЗА\n" \
                         f"ФИО: {user_data['full_name']}\n" \
                         f"Контакт: {user_data['phone_number']}\n" \
                         f"Адрес: {user_data['address']}\n" \
-                        f"‍ВЫБРАННЫЕ ТОВАРЫ ‍\n" \
-                        f"➀ Категория товара: {category}\n" \
-                        f"➁ Размер товара: {size}\n" \
-                        f"➂ Цвет товара: {color}\n" \
-                        f"➃ Ссылка на товар: {link}\n" \
-                        f"➄ Стоимость товара: {price_rub:.2f}₽\n" \
-                        f"➅ Стоимость доставки ({delivery_method}): {delivery_price_rub}₽\n" \
-                        f"ОБЩАЯ СТОИМОСТЬ: {total_price:.2f}₽\n\n"\
-                        f"Мы выкупаем товар в течение 8 часов после оплаты. Если при выкупе цена изменится, с вами свяжется менеджер для доплаты или возврата средств.\n" \
-                        f"Если Вас все устраивает, переведите сумму {total_price:.2f}₽:\n" \
-                        f"️ Карта (Сбербанк): {payment_details.card_number} \n" \
-                        f"️ или СБП: {payment_details.phone_number}\n" \
-                        f"️ ФИО получателя: {payment_details.FIO}\n\n" \
-                        f"Осуществляя перевод, вы подтверждаете что корректно указали все данные заказа и согласны со сроками доставки. Мы не несем ответственности за соответствие размеров и брак. После оплаты нажмите кнопку 'Подтвердить оплату'"
+                        f"‍ВЫБРАННЫЕ ТОВАРЫ ‍\n"
+    
+    total_price_all_items = 0  # Переменная для хранения общей стоимости всех товаров
 
-    await callback_query.message.answer(confirmation_message, reply_markup=confirmation_keyboard)
-    await callback_query.answer()
-    unique_order_code = await db.generate_unique_code_for_order()
-    await state.update_data(unique_order_code=unique_order_code)
-    await db.add_order(user.id, category, size, color, link, price, delivery_method, total_price, unique_order_code)
-
-
-@router.callback_query(F.data == "back_to_cart")
-async def back_to_cart(callback_query: CallbackQuery, state: FSMContext, db: Database):
-     # Получаем данные пользователя
-    user = await db.get_user_by_tg_id(callback_query.from_user.id)
-    user_data = {
-        'full_name': user.full_name,
-        'phone_number': user.phone_number,
-        'address': user.main_address
-    } 
-
-    # Формируем сообщение для корзины
-    data = await state.get_data()
-    category = data.get('category', 'Не указано')
-    size = data.get('size', 'Не указано')
-    color = data.get('color', 'Не указано')
-    link = data.get('link', 'Не указано')
-    price = data.get('price', 'Не указано')
-    delivery_method = data.get('delivery_method', 'Не указано')
     # Получаем текущий курс юаня к рублю из БД
     cny_to_rub = await db.get_exchange_rate("cny_to_rub")
     if cny_to_rub is None:
@@ -330,33 +317,61 @@ async def back_to_cart(callback_query: CallbackQuery, state: FSMContext, db: Dat
         await state.clear()
         await callback_query.answer()
         return None
+
+    for i, item in enumerate(cart_items):
+        category = item.get('category', 'Не указано')
+        size = item.get('size', 'Не указано')
+        color = item.get('color', 'Не указано')
+        link = item.get('link', 'Не указано')
+        price = item.get('price', 'Не указано')
+        delivery_method = item.get('delivery_method', 'Не указано')
+
+         # Получаем стоимость доставки в юанях из БД
+        delivery_price_rub = await db.get_delivery_price(category, delivery_method)
+        if delivery_price_rub is None:
+           logging.error(f"Не удалось получить цену доставки для категории '{category}' и типа '{delivery_method}' из БД.")
+           delivery_price_rub = 0
+
+        price_rub = price * float(cny_to_rub)
+        total_price = price_rub + delivery_price_rub
+        total_price_all_items += total_price  # Считаем общую стоимость
+
+        confirmation_message += f"{i+1}. Категория: {category}, Размер: {size}, Цвет: {color}, Цена: {total_price:.2f}₽\n"
     
-    # Получаем стоимость доставки в юанях из БД
-    delivery_price_rub = await db.get_delivery_price(category, delivery_method)
-    if delivery_price_rub is None:
-        await state.clear()
-        await callback_query.answer()
-        logging.error(f"Не удалось получить цену доставки для категории '{category}' и типа '{delivery_method}' из БД.")
-        return None
+    confirmation_message += f"ОБЩАЯ СТОИМОСТЬ ВСЕХ ТОВАРОВ: {total_price_all_items:.2f}₽\n\n"
 
-    price_rub = price * float(cny_to_rub)
-    total_price =  price_rub + delivery_price_rub#Рассчет стоимости
 
-    cart_message = f"️КОРЗИНА ЗАКАЗОВ \n" \
-                    f"ФИО: {user_data['full_name']}\n" \
-                    f"Контакт: {user_data['phone_number']}\n" \
-                    f"Адрес: {user_data['address']}\n" \
-                    f"‍ВЫБРАННЫЕ ТОВАРЫ ‍\n" \
-                    f"➀ Категория товара: {category}\n" \
-                    f"➁ Размер товара: {size}\n" \
-                    f"➂ Цвет товара: {color}\n" \
-                    f"➃ Ссылка на товар: {link}\n" \
-                    f"➄ Стоимость товара: {price_rub:.2f}₽\n" \
-                    f"➅ Стоимость доставки ({delivery_method}): {delivery_price_rub}₽\n" \
-                    f"ОБЩАЯ СТОИМОСТЬ: {total_price:.2f}₽\n"
+    payment_details = await db.get_payment_details()
 
-    await callback_query.message.answer(cart_message, reply_markup=cart_keyboard)
+    confirmation_message += (
+         f"Мы выкупаем товар в течение 8 часов после оплаты. Если при выкупе цена изменится, с вами свяжется менеджер для доплаты или возврата средств.\n"
+        f"Если Вас все устраивает, переведите сумму {total_price_all_items:.2f}₽:\n"
+        f"️ Карта (Сбербанк): {payment_details.card_number} \n"
+        f"️ или СБП: {payment_details.phone_number}\n"
+        f"️ ФИО получателя: {payment_details.FIO}\n\n"
+        f"Осуществляя перевод, вы подтверждаете что корректно указали все данные заказа и согласны со сроками доставки. Мы не несем ответственности за соответствие размеров и брак. После оплаты нажмите кнопку 'Подтвердить оплату'"
+    )
+    
+    await callback_query.message.answer(confirmation_message, reply_markup=confirmation_keyboard)
     await callback_query.answer()
+    unique_order_code = await db.generate_unique_code_for_order()
+    await state.update_data(unique_order_code=unique_order_code)
+     # Сохраняем информацию о каждом товаре в базе данных
+    for item in cart_items:
+        category = item.get('category')
+        size = item.get('size')
+        color = item.get('color')
+        link = item.get('link')
+        price = item.get('price')
+        delivery_method = item.get('delivery_method')
+
+        # Добавляем заказ в базу данных
+        await db.add_order(user.id, category, size, color, link, price, delivery_method, total_price, unique_order_code)
+
+
+@router.callback_query(F.data == "back_to_cart")
+async def back_to_cart(callback_query: CallbackQuery, state: FSMContext, db: Database):
+    await display_cart(callback_query, state, db)  # Используем функцию display_cart
 
 @router.callback_query(F.data == "confirm_payment")
 async def process_confirm_payment(callback_query: CallbackQuery, state: FSMContext):
@@ -466,10 +481,51 @@ async def process_add_another_item(callback_query: CallbackQuery, state: FSMCont
 async def process_remove_items(callback_query: CallbackQuery, state: FSMContext):
     """
     Обработчик нажатия на кнопку "Удалить товары".
-    TODO: Добавить логику удаления товаров из корзины.
     """
-    await callback_query.message.answer("Функциональность удаления товаров из корзины не реализована.")
+    # Получаем данные из FSM
+    data = await state.get_data()
+    cart_items = data.get('cart_items', [])
+
+    # Если корзина пуста
+    if not cart_items:
+        await callback_query.message.answer("Ваша корзина пуста. 😔")
+        await callback_query.answer()
+        return
+
+   # Создаем клавиатуру с кнопками для удаления каждого товара
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"Удалить товар {i+1} ✖️", callback_data=f"remove_item:{i}")]
+        for i in range(len(cart_items))
+    ])
+
+    await callback_query.message.answer("Выберите товар, который хотите удалить:", reply_markup=keyboard)
     await callback_query.answer()
+
+@router.callback_query(F.data.startswith("remove_item:"))
+async def process_remove_item(callback_query: CallbackQuery, state: FSMContext, db: Database):
+    """
+    Обработчик нажатия на кнопку "Удалить товар {i}".
+    """
+    # Получаем индекс товара для удаления
+    item_index = int(callback_query.data.split(":")[1])
+
+    # Получаем данные из FSM
+    data = await state.get_data()
+    cart_items = data.get('cart_items', [])
+
+    # Проверяем, что индекс находится в пределах списка товаров
+    if 0 <= item_index < len(cart_items):
+        # Удаляем товар из корзины
+        del cart_items[item_index]
+        await state.update_data(cart_items=cart_items)
+
+        # Отображаем обновленную корзину
+        await display_cart(callback_query, state, db)
+        await callback_query.answer()
+
+    else:
+        await callback_query.answer("Произошла ошибка при удалении товара. 😔")
+
 
 # ===  Отслеживание заказа ===
 
@@ -509,5 +565,3 @@ async def status_info_handler(callback_query: CallbackQuery):
     """
     await callback_query.message.answer("Информация о статусах: ... (Замените на реальную информацию)")
     await callback_query.answer()
-
-

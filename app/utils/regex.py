@@ -124,24 +124,6 @@ def validate_age(age: str) -> bool:
         return False
 
 
-def validate_children_count(count: str) -> bool:
-    """
-    Проверяет, является ли строка корректным количеством детей (неотрицательное целое число).
-
-    Args:
-        count: Строка для проверки.
-
-    Returns:
-        True, если строка является валидным количеством детей, иначе False.
-    """
-    if not isinstance(count, str):
-      return False
-    try:
-        count = int(count)
-        return count >= 0
-    except ValueError:
-        return False
-
 
 
 def validate_full_name(full_name: str) -> bool:
@@ -199,25 +181,41 @@ def validate_city_name(city_name: str) -> bool:
     return True  # Если все проверки пройдены, название города корректно
 
 
-def validate_user_status(user_status: str) -> bool:
-    """
-    Проверяет, является ли введенный статус пользователя корректным.
+# --- Функции валидации ---
 
-    Args:
-        user_status (str): Статус пользователя в Германии.
+async def validate_price(price: str) -> float | None:
+    """Проверяет, является ли введенное значение ценой."""
+    try:
+        price_float = float(price)
+        if price_float > 0:  # Проверка на положительное значение
+            return price_float
+        else:
+            return None  # Цена должна быть положительной
+    except ValueError:
+        return None  # Не удалось преобразовать в число
 
-    Returns:
-        bool: True, если статус корректный, иначе False.
-    """
-    if not user_status:
-        return False  # Статус не может быть пустым
+async def validate_size(size: str) -> str:
+    """Проверяет, что размер - это строка, или 'нет'."""
+    size = size.lower()
+    if size == "нет":
+        return "нет"
+    return size #Размер может быть любым
 
-    # На данном этапе мы просто проверяем, что строка не пустая
-    # Можно добавить дополнительные проверки по необходимости
-    # Например, проверять на соответствие списку допустимых значений
-    # или проверять наличие определенных слов в строке, если необходимо
+async def validate_color(color: str) -> str:
+    """Проверяет, что цвет - это строка, или 'нет'."""
+    color = color.lower()
+    if color == "нет":
+        return "нет"
+    return color #Цвет может быть любым
 
-    return True # если все проверки пройдены, статус корректен
+async def validate_link(link: str) -> str | None:
+    """Проверяет, что ссылка похожа на URL. (Базовая проверка)"""
+    if link.startswith("http://") or link.startswith("https://"):
+        return link
+    else:
+        return None  # Некорректная ссылка
+
+
 
 
 if __name__ == '__main__':
@@ -229,9 +227,6 @@ if __name__ == '__main__':
     print(f"Valid age: {validate_age('25')}")           # True
     print(f"Invalid age: {validate_age('-5')}")          # False
     print(f"Invalid age: {validate_age('string')}")          # False
-    print(f"Valid children count: {validate_children_count('3')}") # True
-    print(f"Invalid children count: {validate_children_count('-2')}") # False
-    print(f"Invalid children count: {validate_children_count('text')}") # False
 
     name1 = "Иван Иванов иванович"
     name2 = "Петр-Иванов"
