@@ -2,13 +2,14 @@
 import datetime
 from typing import Optional, List
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship, joinedload
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy import MetaData, select
 from sqlalchemy.schema import CreateTable
 import string
 import logging  # Импортируем модуль logging
 import sqlalchemy
+import pandas as pd # Import pandas
 
 from app.database.models import User, Order, Base, DATABASE_URL, ExchangeRate, DeliveryPrice, PaymentDetails  # Добавляем импорт PaymentDetails
 
@@ -35,24 +36,6 @@ class Database:
     async def get_async_session(self) -> AsyncSession:
         return self.async_session_maker()
 
-    async def generate_unique_code_for_order(self) -> str:
-        """Generates a unique order code in the range A001-Z999."""
-        try:
-            async with await self.get_async_session() as session:
-                query = select(Order.order_code).distinct()
-                result = await session.execute(query)
-                existing_codes = [row[0] for row in result.all()]
-
-                for letter in string.ascii_uppercase:
-                    for number in range(1, 1000):
-                        code = f"{letter}{number:03}"
-                        if code not in existing_codes:
-                            return code
-                return None  # Handle the unlikely case of all codes being exhausted
-        except Exception as e:
-            logging.error(f"Error generating unique code for order: {e}")
-            raise
-
     async def generate_unique_code_for_user(self) -> str:
         """Generates a unique user code in the range A001-Z999."""
         try:
@@ -62,6 +45,7 @@ class Database:
                 existing_codes = [row[0] for row in result.all()]
 
                 for letter in string.ascii_uppercase:
+                    if letter == 'F': continue
                     for number in range(1, 1000):
                         code = f"{letter}{number:03}"
                         if code not in existing_codes:
@@ -71,18 +55,40 @@ class Database:
             logging.error(f"Error generating unique code for order: {e}")
             raise
 
-    async def add_user(self, tg_id: int, full_name: str, phone_number: str, main_address: str,
-                       unique_code: str) -> User:
+    async def add_user(self, tg_id: int, full_name: str, phone_number: str, main_address: str, 
+                       unique_code: str, telegram_link: str = None): 
+        """
+        Добавляет нового пользователя в базу данных.
+
+        Args:
+            tg_id: Telegram ID пользователя.
+            full_name: Полное имя пользователя.
+            phone_number: Номер телефона пользователя.
+            main_address: Основной адрес пользователя.
+            unique_code: Уникальный код пользователя.
+            telegram_link: Ссылка на профиль пользователя (опционально).
+
+        Returns:
+            User: Объект User, если пользователь успешно добавлен, иначе None.
+        """
         try:
             async with await self.get_async_session() as session:
-                user = User(tg_id=tg_id, full_name=full_name, phone_number=phone_number, main_address=main_address,
-                            unique_code=unique_code)
+                user = User(
+                    tg_id=tg_id,
+                    full_name=full_name,
+                    phone_number=phone_number,
+                    main_address=main_address,
+                    unique_code=unique_code,
+                    telegram_link=telegram_link
+                )
                 session.add(user)
                 await session.commit()
+                await session.refresh(user)
                 return user
         except Exception as e:
             logging.error(f"Error adding user: {e}")
-            raise
+            await session.rollback()
+            return None    
 
     async def get_user_by_phone(self, phone_number: str) -> Optional[User]:
         try:
@@ -115,13 +121,13 @@ class Database:
             return None
 
     async def add_order(self, user_id: int, category: str, size: str, color: str, link: str,
-                        price: float, delivery_method: str, total_price: float, order_code: str,
+                        price: float, delivery_method: str, total_price: float, 
                         promocode: Optional[str] = None) -> Order:
         try:
             async with await self.get_async_session() as session:
                 order = Order(user_id=user_id, category=category, size=size, color=color, link=link,
                               price=price, delivery_method=delivery_method, total_price=total_price,
-                              promocode=promocode, order_code=order_code)
+                              promocode=promocode)
                 session.add(order)
                 await session.commit()
                 return order
@@ -151,19 +157,46 @@ class Database:
     async def get_order_by_code(self, order_code: str) -> Optional[Order]:
         try:
             async with await self.get_async_session() as session:
-                result = await session.execute(select(Order).where(Order.order_code == order_code))
+                result = await session.execute(select(Order).where(Order.id == order_code))
                 order = result.scalars().first()
                 return order
         except Exception as e:
             logging.error(f"Error getting order by code: {e}")
             raise
 
+    async def get_orders_by_user_code(self, user_code: str) -> Optional[List[Order]]:
+        try:
+            async with await self.get_async_session() as session:
+                stmt = select(Order).join(User, User.id == Order.user_id).where(
+                    User.unique_code == user_code).options(joinedload(Order.user))
+                result = await session.execute(stmt)
+                orders = result.scalars().all()
+                return orders
+        except Exception as e:
+            logging.error(f"Error getting orders by status: {e}")
+            raise
+   
+
+
+    async def get_orders_by_status(self, status: str) -> Optional[List[Order]]:
+        try:
+            async with await self.get_async_session() as session:
+                stmt = select(Order).join(User, User.id == Order.user_id).where(Order.status == status).options(joinedload(Order.user))  # Добавляем eager loading
+                result = await session.execute(stmt)
+                orders = result.scalars().all()
+                return orders
+        except Exception as e:
+            logging.error(f"Error getting orders by status: {e}")
+            raise
+
+
+
     async def update_order_status(self, order_code: str, new_status: str):
         try:
             async with await self.get_async_session() as session:
 
                 order = await session.execute(
-                    select(Order).where(Order.order_code == order_code)
+                    select(Order).where(Order.id == order_code)
                 )
                 order = order.scalar_one_or_none()
 
@@ -388,6 +421,59 @@ class Database:
             await self.engine.dispose()
         except Exception as e:
             logging.error(f"Error closing database connection: {e}")
+    # ----------------------------------------------------------
+    # Методы для выгрузки данных в Excel (возвращают путь к файлу)
+    # ----------------------------------------------------------
+
+    async def export_users_to_excel(self, excel_filename="data/users_report.xlsx") -> Optional[str]:
+        """Exports the contents of the 'users' table to an Excel file and returns the file path."""
+        try:
+            async with await self.get_async_session() as session:
+                # Fetch all users from the database
+                users = await session.execute(select(User))
+                users = users.scalars().all()
+
+                # Convert users to a list of dictionaries
+                user_list = [user.__dict__ for user in users]
+
+                # Create a Pandas DataFrame from the list
+                df = pd.DataFrame(user_list)
+
+                # Remove unnecessary columns (e.g., '_sa_instance_state')
+                df = df = df.drop(columns=['_sa_instance_state'], errors='ignore')
+
+                # Save the DataFrame to an Excel file
+                df.to_excel(excel_filename, index=False)
+
+            return excel_filename  # Return the file path
+        except Exception as e:
+            logging.error(f"Error exporting 'users' table to Excel: {e}")
+            return None  # Return None in case of an error
+
+    async def export_orders_to_excel(self, excel_filename="data/orders_report.xlsx") -> Optional[str]:
+        """Exports the contents of the 'orders' table to an Excel file and returns the file path."""
+        try:
+            async with await self.get_async_session() as session:
+                # Fetch all orders from the database
+                orders = await session.execute(select(Order))
+                orders = orders.scalars().all()
+
+                # Convert orders to a list of dictionaries
+                order_list = [order.__dict__ for order in orders]
+
+                # Create a Pandas DataFrame from the list
+                df = pd.DataFrame(order_list)
+
+                # Remove unnecessary columns (e.g., '_sa_instance_state')
+                df = df.drop(columns=['_sa_instance_state'], errors='ignore')
+
+                # Save the DataFrame to an Excel file
+                df.to_excel(excel_filename, index=False)
+
+            return excel_filename  # Return the file path
+        except Exception as e:
+            logging.error(f"Error exporting 'orders' table to Excel: {e}")
+            return None  # Return None in case of an error
 
 # --- Пример использования ---
 
@@ -428,6 +514,9 @@ async def main():
         print(f"An error occurred: {e}")
     finally:
         await db.close()
+
+
+
 
 if __name__ == "__main__":
     import asyncio

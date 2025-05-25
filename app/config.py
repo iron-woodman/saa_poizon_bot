@@ -27,7 +27,8 @@ if not os.path.exists(PAY_SCREENS_DIR):
 
 def is_admin(user_id: int) -> bool:
     """Проверяет, является ли пользователь администратором."""
-    # if user_id in ADMIN_IDS:
-    #     print('админ')
-
     return user_id in ADMIN_IDS
+
+def is_manager(user_id: int) -> bool:
+    """Проверяет, является ли пользователь менеджером"""
+    return str(user_id) == MANAGER_TELEGRAM_ID

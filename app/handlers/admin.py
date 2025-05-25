@@ -4,7 +4,7 @@ import logging
 from typing import Dict, Any
 from aiogram import F, Router, Bot
 from aiogram.types import (Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, Document,
-    InlineKeyboardButton, InlineKeyboardMarkup)
+    InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile)
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from typing import Optional, List
@@ -31,7 +31,7 @@ def format_order_for_telegram(order: Order) -> str:
     Добавляет эмодзи для улучшения восприятия.
     """
 
-    message = f"📦 *Заказ №{order.order_code}*\n\n"  # Используем order_code вместо order.id
+    message = f"📦 *Заказ №{order.id}*\n\n"
     message += f"🗓️ Дата заказа: {order.order_date.strftime('%d.%m.%Y %H:%M')}\n"  # Более читаемый формат даты
     message += f"🏷️ Категория: {order.category}\n"
     message += f"📏 Размер: {order.size}\n"
@@ -97,7 +97,7 @@ async def process_user_tg_id(message: Message, state: FSMContext, db: Database):
         order_message = f'Активные заказы пользователя ({user_tg_id}):\n'
         codes = []
         for order in orders:
-            codes.append(order.order_code)
+            codes.append(order.id)
             order_info = format_order_for_telegram(order)
             order_message += order_info
             order_message += '\n'
@@ -113,49 +113,49 @@ async def process_user_tg_id(message: Message, state: FSMContext, db: Database):
         await message.answer(f"Нет активных заказов для пользователя с tg_id {user_tg_id}")
 
 
-@router.callback_query(F.data.startswith(CALLBACK_DATA_PREFIX))
-async def process_order_selection(callback: CallbackQuery, state: FSMContext, db: Database):
-    """
-    Обработчик нажатия на кнопки с code заказов.
-    """
-    order_code = callback.data[len(CALLBACK_DATA_PREFIX):]  # Извлекаем code заказа из callback_data
+# @router.callback_query(F.data.startswith(CALLBACK_DATA_PREFIX))
+# async def process_order_selection(callback: CallbackQuery, state: FSMContext, db: Database):
+#     """
+#     Обработчик нажатия на кнопки с code заказов.
+#     """
+#     order_code = callback.data[len(CALLBACK_DATA_PREFIX):]  # Извлекаем code заказа из callback_data
 
-    order = await db.get_order_by_code(order_code=order_code)
-    if order:
-        await state.update_data(order_code=order_code)
-        order_info = format_order_for_telegram(order)
-        # print(order_info)
-        await callback.message.answer(f"Информация о заказе ({order_code}) : \n{order_info}") # Уведомление вверху экрана
-        await callback.message.answer(f"Укажите новый статус заказа:", reply_markup=order_status_keyboard)
-    else:
-        await callback.message.answer(f"Нет данных по заказу {order_code}.")
-    await callback.answer() #  Обязательно отвечаем на callback query, даже если ничего не делаем
+#     order = await db.get_order_by_code(order_code=order_code)
+#     if order:
+#         await state.update_data(order_code=order_code)
+#         order_info = format_order_for_telegram(order)
+#         # print(order_info)
+#         await callback.message.answer(f"Информация о заказе ({order_code}) : \n{order_info}") # Уведомление вверху экрана
+#         await callback.message.answer(f"Укажите новый статус заказа:", reply_markup=order_status_keyboard)
+#     else:
+#         await callback.message.answer(f"Нет данных по заказу {order_code}.")
+#     await callback.answer() #  Обязательно отвечаем на callback query, даже если ничего не делаем
 
 
 
-@router.callback_query(lambda c: c.data.startswith('status_'))
-async def process_status_selection(callback: CallbackQuery, state: FSMContext, db: Database):
-    """
-    Обработчик для выбора статуса заказа.
-    """
-    selected_status = callback.data[len('status_'):] # Извлекаем статус из callback_data
-    data = await state.get_data()
-    order_code = data.get('order_code')
+# @router.callback_query(lambda c: c.data.startswith('status_'))
+# async def process_status_selection(callback: CallbackQuery, state: FSMContext, db: Database):
+#     """
+#     Обработчик для выбора статуса заказа.
+#     """
+#     selected_status = callback.data[len('status_'):] # Извлекаем статус из callback_data
+#     data = await state.get_data()
+#     order_code = data.get('order_code')
 
-    if not order_code:
-        await callback.answer("Не найден order_code в state. Пожалуйста, выберите заказ заново.")
-        return
+#     if not order_code:
+#         await callback.answer("Не найден order_code в state. Пожалуйста, выберите заказ заново.")
+#         return
 
-    # Обновляем статус заказа в базе данных
-    success = await db.update_order_status(order_code, selected_status)
+#     # Обновляем статус заказа в базе данных
+#     success = await db.update_order_status(order_code, selected_status)
 
-    if success:
-        await callback.message.answer(f"Статус заказа {order_code} успешно изменен на: {selected_status}")
-    else:
-        await callback.message.answer(f"Не удалось обновить статус заказа {order_code}.")
+#     if success:
+#         await callback.message.answer(f"Статус заказа {order_code} успешно изменен на: {selected_status}")
+#     else:
+#         await callback.message.answer(f"Не удалось обновить статус заказа {order_code}.")
 
-    await callback.answer() #Отвечаем на callback
-    await callback.message.answer('Основное меню:', reply_markup=admin_keyboard)
+#     await callback.answer() #Отвечаем на callback
+#     await callback.message.answer('Основное меню:', reply_markup=admin_keyboard)
 
 @router.callback_query(F.data == "all_orders")
 async def show_all_orders(callback: CallbackQuery, db: Database):
@@ -174,6 +174,54 @@ async def show_all_orders(callback: CallbackQuery, db: Database):
     
     await callback.answer()
     await callback.message.answer('Основное меню:', reply_markup=admin_keyboard)
+
+
+@router.callback_query(F.data == "orders_report")
+async def orders_report(callback: CallbackQuery, db: Database, bot: Bot):
+    """Обработчик для кнопки 'Все заказы'."""
+    try:
+        filepath = await db.export_orders_to_excel()
+        if filepath:
+            try:
+                document = FSInputFile(filepath)  # Создаем FSInputFile
+                await bot.send_document(callback.message.chat.id, document=document)  # Отправляем документ
+            except FileNotFoundError:
+                await callback.message.answer("Ошибка: Файл не найден.")
+        else:
+            await callback.message.answer("Ошибка при генерации отчета. Пожалуйста, проверьте логи.")
+
+    except Exception as e:
+        logging.error(f"Error in generate_report handler: {e}")
+        await callback.message.answer("Произошла ошибка при генерации отчета.")
+    finally:
+        await callback.answer()  # Обязательно нужно ответить на callbackQuery
+    
+    await callback.message.answer('Основное меню:', reply_markup=admin_keyboard)
+
+
+@router.callback_query(F.data == "users_report")
+async def users_report(callback: CallbackQuery, db: Database, bot: Bot):
+    """Обработчик для кнопки 'Все заказы'."""
+    try:
+        filepath = await db.export_users_to_excel()
+        if filepath:
+            try:
+                document = FSInputFile(filepath)  # Создаем FSInputFile
+                await bot.send_document(callback.message.chat.id, document=document)  # Отправляем документ
+            except FileNotFoundError:
+                await callback.message.answer("Ошибка: Файл не найден.")
+        else:
+            await callback.message.answer("Ошибка при генерации отчета. Пожалуйста, проверьте логи.")
+
+    except Exception as e:
+        logging.error(f"Error in generate_report handler: {e}")
+        await callback.message.answer("Произошла ошибка при генерации отчета.")
+    finally:
+        await callback.answer()  # Обязательно нужно ответить на callbackQuery
+
+    await callback.message.answer('Основное меню:', reply_markup=admin_keyboard)
+    
+
 
 
 @router.callback_query(F.data == "update_prices")

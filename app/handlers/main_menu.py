@@ -43,12 +43,14 @@ async def track_order(callback_query: CallbackQuery, state: FSMContext, db: Data
             username = callback_query.from_user.username
             user_id = callback_query.from_user.id
             full_name = callback_query.from_user.full_name
+            user_code = existing_user.unique_code
+            tlg_link = existing_user.telegram_link
 
             # Формируем сообщение с информацией о пользователе.  Проверяем наличие username.
             if username:
-                user_info = f"Пользователь: {full_name} (@{username}, ID: {user_id})"
+                user_info = f"Пользователь: {full_name} (@{username}, Code: {user_code})"
             else:
-                user_info = f"Пользователь: {full_name} (ID: {user_id}, username отсутствует)"
+                user_info = f"Пользователь: {full_name} (Code: {user_code}, username отсутствует)"
 
             req_text =f'{user_info} запросил трекинг заказа.'
             await bot.send_message(chat_id=MANAGER_TELEGRAM_ID, text=req_text)

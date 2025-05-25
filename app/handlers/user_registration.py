@@ -58,7 +58,6 @@ async def register_phone_number(message: Message, state: FSMContext):
     else:
         await message.answer("Пожалуйста, введите корректный номер телефона.")
 
-
 @router.message(UserProfileData.waiting_for_address)
 async def register_user_status(message: Message, state: FSMContext, bot: Bot, db: Database): # Добавляем bot: Bot в аргументы
     address = message.text
@@ -69,13 +68,19 @@ async def register_user_status(message: Message, state: FSMContext, bot: Bot, db
         
         data['unique_code'] = await db.generate_unique_code_for_user()
 
+        # Формируем ссылку на профиль пользователя
+        telegram_link = f"tg://user?id={message.from_user.id}"
+
+        data['telegram_link'] = telegram_link
+
         # Добавляем пользователя в базу данных
         user = await db.add_user(
             tg_id=data['tg_id'],
             full_name=data['full_name'],
             phone_number=data['phone_number'],
             main_address=data['address'],
-            unique_code=data['unique_code']
+            unique_code=data['unique_code'],
+            telegram_link=data['telegram_link']  # Сохраняем ссылку в БД
         )
 
         if user:
@@ -102,9 +107,11 @@ async def register_user_status(message: Message, state: FSMContext, bot: Bot, db
                 f"ФИО: {data.get('full_name', 'Не указано')}\n" \
                 f"Телефон: {data.get('phone_number', 'Не указано')}\n" \
                 f"Адрес: {data.get('address', 'Не указано')}\n" \
-                f"Order_ID: {data.get('unique_code', 'Не указано')}\n" \
+                f"User code: {data.get('unique_code', 'Не указано')}\n" \
                 f"Telegram ID: {data.get('tg_id')}\n" \
-                f"Telegram Username: @{message.from_user.username if message.from_user.username else 'Не указано'}"
+                f"Telegram Username: @{message.from_user.username if message.from_user.username else 'Не указано'}\n" \
+                f"Telegram Link: {data.get('telegram_link')}" #Добавляем ссылку на профиль
+
     
      # Отправляем сообщение менеджеру
     try:
@@ -119,9 +126,11 @@ async def register_user_status(message: Message, state: FSMContext, bot: Bot, db
             f"ФИО: {data.get('full_name', 'Не указано')}\n" \
             f"Телефон: {data.get('phone_number', 'Не указано')}\n" \
             f"Адрес: {data.get('address', 'Не указано')}\n" \
-            f"Order_ID: {data.get('unique_code', 'Не указано')}\n" \
+            f"User code: {data.get('unique_code', 'Не указано')}\n" \
             f"Telegram ID: {data.get('tg_id')}\n" \
-            f"Telegram Username: @{message.from_user.username if message.from_user.username else 'Не указано'}"
+            f"Telegram Username: @{message.from_user.username if message.from_user.username else 'Не указано'}\n" \
+            f"Telegram Link: {data.get('telegram_link')}" #Добавляем ссылку на профиль
+
               ),
               reply_markup=order_management_keyboard
               

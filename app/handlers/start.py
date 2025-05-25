@@ -4,7 +4,8 @@ from pathlib import Path
 from aiogram.types import ReplyKeyboardRemove, FSInputFile, CallbackQuery
 from app.keyboards.main_kb import main_keyboard, user_inline_menu
 from app.keyboards.admin_kb import admin_keyboard
-from app.config import is_admin
+from app.keyboards.manager_kb import manager_keyboard
+from app.config import is_admin, is_manager
 
 
 router = Router()
@@ -33,7 +34,14 @@ async def start_command(message: types.Message, bot: Bot):
                 caption="Добро пожаловать, администратор!",
                 reply_markup=admin_keyboard # Отправляем клавиатуру администратора
             )
-
+        elif is_manager(message.from_user.id):
+            # Пользователь - администратор, отправляем админ-меню
+            await bot.send_photo(
+                chat_id=message.chat.id,
+                photo=photo,
+                caption="Добро пожаловать, менеджер!",
+                reply_markup=manager_keyboard # Отправляем клавиатуру менеджера
+            )
         else:
             # Обычный пользователь, отправляем обычное меню
             await bot.send_photo(
@@ -53,10 +61,22 @@ async def menu_button_handler(message: types.Message):
     Этот обработчик реагирует на нажатие кнопки, текст которой содержит "Меню", независимо от того, что находится до или после.
     Использует регулярное выражение.
     """
-    await message.answer(
+
+    if is_admin(message.from_user.id):
+        await message.answer(
         "Основное меню:",
-        reply_markup=user_inline_menu
+        reply_markup=admin_keyboard
     )
+    elif is_manager(message.from_user.id):
+        await message.answer(
+        "Основное меню:",
+        reply_markup=manager_keyboard
+         )
+    else:
+        await message.answer(
+            "Основное меню:",
+            reply_markup=user_inline_menu
+        )
 
 
 @router.message(F.text.regexp(r".*Помощь.*"))

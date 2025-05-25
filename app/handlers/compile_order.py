@@ -85,7 +85,7 @@ async def process_category(callback_query: CallbackQuery, state: FSMContext, db:
             await state.clear()
             await callback_query.answer()
             return None
-        
+
         text = (
             "Введите сумму товара в CNY:\n\n"
             f"🇨🇳 Курс на сегодня ({datetime.datetime.now().strftime('%d.%m.%Y')}):\n"
@@ -102,19 +102,20 @@ async def process_price(message: Message, state: FSMContext):
     """
     Обработчик ввода суммы товара.
     """
-    try:
-        price = float(message.text)
-        await state.update_data(price=price)
-        await message.answer(
-            '''
+    price = await validate_price(message.text)
+    if price is None:
+        await message.answer("Пожалуйста, введите корректную сумму в формате числа (например, 123.45).  Цена должна быть положительной.")
+        return
+
+    await state.update_data(price=price)
+    await message.answer(
+        '''
 📏 Размер товара:\n
 Укажите размер Вашего товара, чтобы мы не ошиблись с заказом.\n
 Пример: XS или 52 для одежды 👚\n 41 или 37,5 для обуви 👟 . \n
 Если товар продается без размера, то напишите слово "НЕТ".
 ''')
-        await state.set_state(OrderForm.waiting_for_size)
-    except ValueError:
-        await message.answer("Пожалуйста, введите корректную сумму в формате числа (например, 123.45)")
+    await state.set_state(OrderForm.waiting_for_size)
 
 
 @router.message(OrderForm.waiting_for_size)
@@ -122,9 +123,9 @@ async def process_size(message: Message, state: FSMContext):
     """
     Обработчик ввода размера товара.
     """
-    size = message.text
+    size = await validate_size(message.text)
     await state.update_data(size=size)
-    await message.answer("Введите цвет товара:")
+    await message.answer("Введите цвет товара (или напишите слово 'НЕТ') :")
     await state.set_state(OrderForm.waiting_for_color)
 
 
@@ -133,7 +134,7 @@ async def process_color(message: Message, state: FSMContext):
     """
     Обработчик ввода цвета товара.
     """
-    color = message.text
+    color = await validate_color(message.text)
     await state.update_data(color=color)
     await message.answer("Введите ссылку на товар:")
     await state.set_state(OrderForm.waiting_for_link)
@@ -144,7 +145,11 @@ async def process_link(message: Message, state: FSMContext):
     """
     Обработчик ввода ссылки на товар.
     """
-    link = message.text
+    link = await validate_link(message.text)
+    if link is None:
+        await message.answer("Пожалуйста, введите корректную ссылку на товар, начинающуюся с http:// или https://.")
+        return
+
     await state.update_data(link=link)
     await message.answer("Доставка заказа:\nВыберите наиболее подходящий способ доставки Вашего заказа:\n",
                          reply_markup=delivery_keyboard)
@@ -185,7 +190,7 @@ async def process_delivery_method(callback_query: CallbackQuery, state: FSMConte
 
     # Отображаем корзину
     await display_cart(callback_query, state, db)
-    
+
 
 async def display_cart(callback_query: CallbackQuery, state: FSMContext, db: Database):
     """
@@ -229,7 +234,7 @@ async def display_cart(callback_query: CallbackQuery, state: FSMContext, db: Dat
         await callback_query.message.answer("Не удалось получить курс юаня из БД.")
         await state.clear()
         return None
-    
+
     # Добавляем информацию о каждом товаре
     for i, item in enumerate(cart_items):
         category = item.get('category', 'Не указано')
@@ -253,7 +258,7 @@ async def display_cart(callback_query: CallbackQuery, state: FSMContext, db: Dat
 
     # Создаем inline-кнопки для удаления товаров
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🗑️ Удалить товар", callback_data="remove_items")], 
+        [InlineKeyboardButton(text="🗑️ Удалить товар", callback_data="remove_items")],
         [InlineKeyboardButton(text="✅ Продолжить оформление", callback_data="continue_checkout")],
         [InlineKeyboardButton(text="➕ Добавить товар", callback_data="add_another_item")],
         [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_order")]
@@ -294,7 +299,7 @@ async def process_continue_checkout(callback_query: CallbackQuery, state: FSMCon
         'full_name': user.full_name,
         'phone_number': user.phone_number,
         'address': user.main_address
-    } 
+    }
 
     # Получаем данные из FSM
     data = await state.get_data()
@@ -306,7 +311,7 @@ async def process_continue_checkout(callback_query: CallbackQuery, state: FSMCon
                         f"Контакт: {user_data['phone_number']}\n" \
                         f"Адрес: {user_data['address']}\n" \
                         f"‍ВЫБРАННЫЕ ТОВАРЫ ‍\n"
-    
+
     total_price_all_items = 0  # Переменная для хранения общей стоимости всех товаров
 
     # Получаем текущий курс юаня к рублю из БД
@@ -337,7 +342,7 @@ async def process_continue_checkout(callback_query: CallbackQuery, state: FSMCon
         total_price_all_items += total_price  # Считаем общую стоимость
 
         confirmation_message += f"{i+1}. Категория: {category}, Размер: {size}, Цвет: {color}, Цена: {total_price:.2f}₽\n"
-    
+
     confirmation_message += f"ОБЩАЯ СТОИМОСТЬ ВСЕХ ТОВАРОВ: {total_price_all_items:.2f}₽\n\n"
 
 
@@ -351,11 +356,9 @@ async def process_continue_checkout(callback_query: CallbackQuery, state: FSMCon
         f"️ ФИО получателя: {payment_details.FIO}\n\n"
         f"Осуществляя перевод, вы подтверждаете что корректно указали все данные заказа и согласны со сроками доставки. Мы не несем ответственности за соответствие размеров и брак. После оплаты нажмите кнопку 'Подтвердить оплату'"
     )
-    
+
     await callback_query.message.answer(confirmation_message, reply_markup=confirmation_keyboard)
     await callback_query.answer()
-    unique_order_code = await db.generate_unique_code_for_order()
-    await state.update_data(unique_order_code=unique_order_code)
      # Сохраняем информацию о каждом товаре в базе данных
     for item in cart_items:
         category = item.get('category')
@@ -366,7 +369,7 @@ async def process_continue_checkout(callback_query: CallbackQuery, state: FSMCon
         delivery_method = item.get('delivery_method')
 
         # Добавляем заказ в базу данных
-        await db.add_order(user.id, category, size, color, link, price, delivery_method, total_price, unique_order_code)
+        await db.add_order(user.id, category, size, color, link, price, delivery_method, total_price)
 
 
 @router.callback_query(F.data == "back_to_cart")

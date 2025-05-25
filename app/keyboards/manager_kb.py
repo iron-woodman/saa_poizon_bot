@@ -3,12 +3,19 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
-admin_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="Загрузить цены 📤", callback_data="update_prices")],
-    [InlineKeyboardButton(text="Отчет [Заказы] 📊", callback_data="orders_report")],
-    [InlineKeyboardButton(text="Отчет [Пользователи] 👥", callback_data="users_report")],
-])
+# Создан, Оплачен, В обработке, Отправлен, Завершен, Отменен
 
+manager_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+    # [InlineKeyboardButton(text="Активные заказы 📦", callback_data="manager_active_orders")],
+    # [InlineKeyboardButton(text="Все заказы 🧾", callback_data="manager_all_orders")],
+    [InlineKeyboardButton(text="Оформлены ✅", callback_data="manager_orders:Создан")],
+    [InlineKeyboardButton(text="Оплачены 💰", callback_data="manager_orders:Оплачен")],  # добавлено эмодзи 💰
+    [InlineKeyboardButton(text="Доставка по Китаю 🇨🇳", callback_data="manager_orders:Доставка по Китаю")],
+    [InlineKeyboardButton(text="Отправлены в РФ 🇷🇺", callback_data="manager_orders:Доставка по РФ")],
+    [InlineKeyboardButton(text="Завершены 🎉", callback_data="manager_orders:Завершен")],
+    [InlineKeyboardButton(text="Отменены ❌", callback_data="manager_orders:Отменен")],
+    [InlineKeyboardButton(text="Обновить статус", callback_data="manager_update_status")],   
+])
 
 
 # Клавиатура статусов заказа (для изменения статуса)
@@ -16,7 +23,8 @@ order_status_keyboard = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="Создан", callback_data="status_Создан")],
     [InlineKeyboardButton(text="Оплачен", callback_data="status_Оплачен")],
     [InlineKeyboardButton(text="В обработке", callback_data="status_В обработке")],
-    [InlineKeyboardButton(text="Отправлен", callback_data="status_Отправлен")],
+    [InlineKeyboardButton(text="Доставка по Китаю", callback_data="status_Доставка по Китаю")],
+    [InlineKeyboardButton(text="Доставка по РФ", callback_data="status_Доставка по РФ")],
     [InlineKeyboardButton(text="Завершен", callback_data="status_Завершен")],
     [InlineKeyboardButton(text="Отменен", callback_data="status_Отменен")],
 ])

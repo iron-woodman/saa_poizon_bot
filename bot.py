@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-from app.handlers import start, main_menu, order_type, user_registration, compile_order, help, admin
+from app.handlers import (start, main_menu, order_type, user_registration, compile_order, help, 
+                          admin, manager)
 from app.database import database
 from app.config import BOT_TOKEN
 from app.database.database import Database  # Импортируйте класс Database
@@ -36,9 +37,8 @@ async def main():
     dp.include_router(compile_order.router)
     dp.include_router(help.router)
     dp.include_router(admin.router)
+    dp.include_router(manager.router)
  
-
-
     # Запускаем бота
     try:
         await dp.start_polling(bot)

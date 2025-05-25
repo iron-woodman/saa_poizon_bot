@@ -28,6 +28,7 @@ class User(Base):
     unique_code = Column(String)  # Код для заказов (генерировать при регистрации)
     main_address = Column(String)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    telegram_link = Column(String, nullable=True)  # Ссылка на профиль
 
     orders = relationship("Order", back_populates="user") # Связь с таблицей заказов
     def __repr__(self):
@@ -53,7 +54,6 @@ class Order(Base):
     #Дополнительные поля для отслеживания
     tracking_number = Column(String, nullable=True)
     estimated_delivery = Column(DateTime, nullable=True)
-    order_code = Column(String)
 
     user = relationship("User", back_populates="orders") # Связь с таблицей пользователей
 
