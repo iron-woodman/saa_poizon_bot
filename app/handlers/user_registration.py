@@ -69,7 +69,11 @@ async def register_user_status(message: Message, state: FSMContext, bot: Bot, db
         data['unique_code'] = await db.generate_unique_code_for_user()
 
         # Формируем ссылку на профиль пользователя
-        telegram_link = f"tg://user?id={message.from_user.id}"
+        username = message.from_user.username
+        telegram_link = ''
+
+        if username:
+            telegram_link = f"https://t.me/{username}"
 
         data['telegram_link'] = telegram_link
 

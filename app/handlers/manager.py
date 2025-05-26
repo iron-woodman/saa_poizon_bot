@@ -33,7 +33,7 @@ def format_order_data(order: Order) -> str:
         return (
             f"Код заказа: {order.id}\n"
             f"Код пользователя: {user.unique_code}\n"
-            f"Телеграм: {user.telegram_link}\n"
+            # f"Телеграм: {user.telegram_link}\n"
             f"Адрес доставки: {user.main_address}\n"
             f"---\n"
         )

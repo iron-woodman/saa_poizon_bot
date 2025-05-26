@@ -288,7 +288,8 @@ async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
     await callback_query.answer()
 
 @router.callback_query(F.data == "continue_checkout")
-async def process_continue_checkout(callback_query: CallbackQuery, state: FSMContext, db: Database):
+async def process_continue_checkout(callback_query: CallbackQuery, state: FSMContext, 
+                                    db: Database, bot: Bot):
     """
     Обработчик нажатия на кнопку "Продолжить оформление".
     """
@@ -370,6 +371,10 @@ async def process_continue_checkout(callback_query: CallbackQuery, state: FSMCon
 
         # Добавляем заказ в базу данных
         await db.add_order(user.id, category, size, color, link, price, delivery_method, total_price)
+        # Отправляем сообщение менеджеру
+        await bot.send_message(chat_id=MANAGER_TELEGRAM_ID, 
+                               text=f"Новый заказ от пользователя {user.unique_code}.")
+      
 
 
 @router.callback_query(F.data == "back_to_cart")
