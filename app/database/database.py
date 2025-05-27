@@ -55,10 +55,10 @@ class Database:
             logging.error(f"Error generating unique code for order: {e}")
             raise
 
-    async def add_user(self, tg_id: int, full_name: str, phone_number: str, main_address: str, 
-                       unique_code: str, telegram_link: str = None): 
+    async def add_or_update_user(self, tg_id: int, full_name: str, phone_number: str, main_address: str, 
+                             unique_code: str, telegram_link: str = None) -> Optional[User]:
         """
-        Добавляет нового пользователя в базу данных.
+        Добавляет нового пользователя или обновляет существующего с таким же tg_id.
 
         Args:
             tg_id: Telegram ID пользователя.
@@ -69,26 +69,41 @@ class Database:
             telegram_link: Ссылка на профиль пользователя (опционально).
 
         Returns:
-            User: Объект User, если пользователь успешно добавлен, иначе None.
+            User: Объект User, если операция успешна, иначе None.
         """
         try:
             async with await self.get_async_session() as session:
-                user = User(
-                    tg_id=tg_id,
-                    full_name=full_name,
-                    phone_number=phone_number,
-                    main_address=main_address,
-                    unique_code=unique_code,
-                    telegram_link=telegram_link
-                )
-                session.add(user)
+                # Ищем пользователя с таким tg_id
+                stmt = select(User).where(User.tg_id == tg_id)
+                result = await session.execute(stmt)
+                user = result.scalars().one_or_none()
+
+                if user:
+                    # Пользователь найден — обновляем поля
+                    user.full_name = full_name
+                    user.phone_number = phone_number
+                    user.main_address = main_address
+                    user.unique_code = unique_code
+                    user.telegram_link = telegram_link
+                else:
+                    # Пользователь не найден — создаём нового
+                    user = User(
+                        tg_id=tg_id,
+                        full_name=full_name,
+                        phone_number=phone_number,
+                        main_address=main_address,
+                        unique_code=unique_code,
+                        telegram_link=telegram_link
+                    )
+                    session.add(user)
+
                 await session.commit()
                 await session.refresh(user)
                 return user
         except Exception as e:
-            logging.error(f"Error adding user: {e}")
-            await session.rollback()
-            return None    
+            logging.error(f"Error adding or updating user: {e}")
+            return None
+
 
     async def get_user_by_phone(self, phone_number: str) -> Optional[User]:
         try:
@@ -114,7 +129,7 @@ class Database:
             async with await self.get_async_session() as session:
                 stmt = select(User).where(User.tg_id == tg_id)
                 result = await session.execute(stmt)
-                user = result.scalars().one_or_none() # Возвращает один объект User
+                user = result.scalars().first() # Возвращает один объект User
                 return user
         except Exception as e:
             logging.error(f"Error getting user by tg_id: {e}")

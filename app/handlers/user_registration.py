@@ -78,7 +78,7 @@ async def register_user_status(message: Message, state: FSMContext, bot: Bot, db
         data['telegram_link'] = telegram_link
 
         # Добавляем пользователя в базу данных
-        user = await db.add_user(
+        user = await db.add_or_update_user(
             tg_id=data['tg_id'],
             full_name=data['full_name'],
             phone_number=data['phone_number'],
