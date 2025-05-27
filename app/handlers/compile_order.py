@@ -418,7 +418,6 @@ async def process_payment_screenshot(message: Message, state: FSMContext, bot: B
 
         await message.answer("Скриншот оплаты получен и отправлен на проверку.\nОжидайте подтверждения от менеджера.")
 
-
         user_id = message.from_user.id
         username = message.from_user.username
         full_name = message.from_user.full_name

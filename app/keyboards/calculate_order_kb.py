@@ -21,7 +21,22 @@ retail_category_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         ]
     ])
 
-
+opt_keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🧑‍💼 Запрос менеджеру",
+                    callback_data="opt_ask_manager"
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📦 Оптовый прайс",
+                    callback_data="shipping_cost"
+                ),
+            ],
+        ]
+    )
 
 
 # async def get_category_keyboard():

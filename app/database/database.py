@@ -114,7 +114,7 @@ class Database:
             async with await self.get_async_session() as session:
                 stmt = select(User).where(User.tg_id == tg_id)
                 result = await session.execute(stmt)
-                user = result.scalar_one_or_none()  # Возвращает один объект User или None
+                user = result.scalars().one_or_none() # Возвращает один объект User
                 return user
         except Exception as e:
             logging.error(f"Error getting user by tg_id: {e}")

@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-from app.handlers import (start, main_menu, order_type, user_registration, compile_order, help, 
+from app.handlers import (calculate_order, start, main_menu, user_registration, compile_order, help, 
                           admin, manager)
 from app.database import database
 from app.config import BOT_TOKEN
@@ -31,7 +31,7 @@ async def main():
 
     # Подключаем роутеры (обработчики)
     dp.include_router(start.router)
-    dp.include_router(order_type.router)
+    dp.include_router(calculate_order.router)
     dp.include_router(main_menu.router)
     dp.include_router(user_registration.router)
     dp.include_router(compile_order.router)

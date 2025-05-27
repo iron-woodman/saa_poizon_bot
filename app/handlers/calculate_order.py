@@ -7,7 +7,7 @@ from aiogram.types import (ReplyKeyboardRemove, CallbackQuery, InlineKeyboardBut
                            InlineKeyboardMarkup, FSInputFile)
 from app.keyboards.main_kb import main_keyboard
 from app.keyboards.calculate_order_kb import (order_type_keyboard, calculate_category_keyboard, 
-                                              registration_keyboard)
+                                              registration_keyboard, opt_keyboard)
 # from app.utils.currency import get_currency_cny
 from app.config import MANAGER_TELEGRAM_ID
 from app.database.database import Database
@@ -45,37 +45,35 @@ async def process_order_type(callback_query: CallbackQuery, state: FSMContext):
     await callback_query.answer()
 
 
-
 @router.callback_query(F.data == 'wholesale')
 async def process_order_type(callback_query: CallbackQuery, state: FSMContext):
     order_type = callback_query.data
     await state.update_data(order_type=order_type)
-
-    opt_keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="🧑‍💼 Связаться с менеджером",
-                    url=f"tg://user?id={MANAGER_TELEGRAM_ID}"
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text="📦 Стоимость доставки и упаковки",
-                    callback_data="shipping_cost"
-                ),
-            ],
-        ]
-    )
-
     await callback_query.message.answer(
         (
-            "Вы выбрали оптовый расчет!\n"
-            "Для расчета стоимости на оптовый заказ свяжитесь пожалуйста с нашим менеджером"),
+            "Вы выбрали оптовый тип заказа!\n"
+            "Для расчета стоимости на оптовый заказ свяжитесь пожалуйста с нашим менеджером "
+            "или ознакомьтесь с текущим прайсом."),
             reply_markup= opt_keyboard
         )
 
     await callback_query.answer()
+    
+
+@router.callback_query(F.data == "opt_ask_manager")
+async def send_opt_request_to_manager(callback_query: CallbackQuery, bot: Bot, db: Database):
+    """Sends opt price calculateion request to manager"""
+
+    tg_id = callback_query.from_user.id
+    user = await db.get_user_by_tg_id(tg_id)
+
+    # print(f"Пользователь {user.telegram_link if user.telegram_link else '' } \
+    #                                 ({user.unique_code}) запросил расчет оптового заказа.")
+    if user:
+        await bot.send_message(chat_id=MANAGER_TELEGRAM_ID, 
+                                text=f"Пользователь {user.telegram_link if user.telegram_link else '' } \
+                                    ({user.unique_code}) запросил расчет оптового заказа.")
+    await callback_query.answer() # Acknowledge callback
 
 @router.callback_query(F.data == "shipping_cost")
 async def send_shipping_cost_document(callback_query: CallbackQuery, bot: Bot):
@@ -84,9 +82,6 @@ async def send_shipping_cost_document(callback_query: CallbackQuery, bot: Bot):
     await bot.send_document(callback_query.from_user.id, document=document, 
                             caption="Шаблон для расчета стоимости доставки и упаковки")
     await callback_query.answer() # Acknowledge callback
-
-
-
 
 @router.callback_query(OrderState.choosing_good, F.data.startswith("calculate_category:"))
 async def process_good_type(callback_query: CallbackQuery, state: FSMContext, db: Database):
