@@ -73,6 +73,8 @@ async def send_opt_request_to_manager(callback_query: CallbackQuery, bot: Bot, d
         await bot.send_message(chat_id=MANAGER_TELEGRAM_ID, 
                                 text=f"Пользователь {user.telegram_link if user.telegram_link else '' } \
                                     ({user.unique_code}) запросил расчет оптового заказа.")
+        await callback_query.message.answer("Ваш запрос уже у нашего менеджера. Скоро он с Вами свяжется.")
+
     await callback_query.answer() # Acknowledge callback
 
 @router.callback_query(F.data == "shipping_cost")
